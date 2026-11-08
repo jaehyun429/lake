@@ -56,6 +56,9 @@ local awareFill: Frame
 local awareText: TextLabel
 local ghostLabel: TextLabel
 local carryLabel: TextLabel
+local staminaFill: Frame
+local staminaTrack: Frame
+local staminaHideToken = 0
 local bannerToken = 0
 
 function HUD.init()
@@ -136,6 +139,22 @@ function HUD.init()
 	})
 
 	-- 물뜨기 게이지
+	-- 스태미나 바 (핫바 위). 가운데 기준으로 양쪽이 줄어듦
+	staminaTrack = frame(gui, {
+		Size = UDim2.fromOffset(240, 4),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -100),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+	})
+	staminaFill = frame(staminaTrack, {
+		Size = UDim2.new(1, 0, 1, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+	})
+
 	gaugeFrame = frame(gui, { Size = UDim2.fromOffset(340, 20), Position = UDim2.new(0.5, -170, 0.78, 0), BackgroundTransparency = 0.2, Visible = false })
 	Instance.new("UICorner", gaugeFrame).CornerRadius = UDim.new(0, 6)
 	gaugeFill = frame(gaugeFrame, { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(70, 140, 190), BackgroundTransparency = 0 })
@@ -257,6 +276,26 @@ function HUD.showResult(win: boolean, reason: string)
 	resultTitle.Text = if win then "살아서 돌아왔다" else "살목지에 삼켜졌다"
 	resultTitle.TextColor3 = if win then Color3.fromRGB(190, 230, 200) else Color3.fromRGB(220, 70, 60)
 	resultReason.Text = reason
+end
+
+-- 달리기 스태미나: 인벤토리(핫바) 바로 위, 반투명 흰 줄이 양쪽 끝에서 가운데로 줄어듦. 가득 차면 서서히 사라짐
+function HUD.setStamina(value: number)
+	local v = math.clamp(value, 0, 1)
+	TweenService:Create(staminaFill, TweenInfo.new(0.12, Enum.EasingStyle.Linear), { Size = UDim2.new(v, 0, 1, 0) }):Play()
+	staminaFill.BackgroundColor3 = if v < 0.26 then Color3.fromRGB(255, 150, 140) else Color3.fromRGB(255, 255, 255)
+	staminaHideToken += 1
+	local token = staminaHideToken
+	if v < 0.999 then
+		staminaTrack.BackgroundTransparency = 0.85
+		staminaFill.BackgroundTransparency = 0.35
+	else
+		task.delay(0.8, function()
+			if token == staminaHideToken then
+				TweenService:Create(staminaTrack, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
+				TweenService:Create(staminaFill, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
+			end
+		end)
+	end
 end
 
 function HUD.setLantern(on: boolean)

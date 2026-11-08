@@ -21,6 +21,9 @@ Config.Player = {
 	SprintSpeed = 21,
 	CarrySpeedMult = 0.7, -- 양동이 들면 70%
 	TrapSlowTime = 3.0, -- 덫 밟은 뒤 발이 묶이는 시간(초)
+	SprintStaminaTime = 5.0, -- 쉬지 않고 달릴 수 있는 시간(초)
+	SprintRegenTime = 7.0, -- 0 에서 가득 차는 데 걸리는 시간(초)
+	SprintMinToStart = 0.25, -- 바닥난 뒤 다시 달리려면 이만큼(비율) 회복돼야 함
 }
 
 -- 랜턴 (F 로 켜고 끄기)
@@ -86,6 +89,7 @@ Config.Map = {
 	LakeCenter = Vector3.new(0, 0, 0),
 	LakeRadius = 92,
 	WaterLevel = -2,
+	BeachWidth = 12, -- 물가 완만한 모래 경사 폭 (호수 밖)
 	CampCenter = Vector3.new(0, 0, 150), -- 출발점·안전지대·출구
 	SafeRadius = 28,
 	GatePosition = Vector3.new(0, 0, 195),

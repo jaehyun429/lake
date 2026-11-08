@@ -57,6 +57,23 @@ local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
 
+-- 호수 중심에서 r 만큼 떨어진 곳의 지면 높이. 땅은 전부 0 으로 평평하고,
+-- 물가만 BeachWidth 폭으로 완만하게 내려가 수면(-2) 아래로 이어짐 (단차 없음).
+local function groundAt(r: number): number
+	local R = M.LakeRadius
+	local W = M.BeachWidth
+	if r >= R + W then
+		return 0
+	elseif r >= R then
+		return (M.WaterLevel - 0) * (R + W - r) / W
+	elseif r >= R - 16 then
+		return M.WaterLevel - (R - r) * 0.2
+	else
+		return math.max(-13, M.WaterLevel - 3.2 - (R - 16 - r) * 0.35)
+	end
+end
+MapBuilder.groundAt = groundAt
+
 ---------------------------------------------------------------- 지형
 local function buildTerrain()
 	local terrain = Workspace.Terrain
@@ -64,13 +81,61 @@ local function buildTerrain()
 	local region = Vector3.new(760, 90, 760)
 	-- 작업 영역만 비우고 다시 채움 (다른 지형은 건드리지 않음)
 	terrain:FillBlock(CFrame.new(c + Vector3.new(0, 0, 60)), region, Enum.Material.Air)
+	-- 땅: 복셀 격자(4)에 맞춘 평평한 블록 (-16 ~ 0). 격자에 맞아야 울퉁불퉁한 단차가 안 생김
 	terrain:FillBlock(CFrame.new(c + Vector3.new(0, -8, 60)), Vector3.new(760, 16, 760), Enum.Material.Grass)
-	terrain:FillCylinder(CFrame.new(c + Vector3.new(0, -2, 0)), 4, M.LakeRadius + 10, Enum.Material.Sand)
-	terrain:FillCylinder(CFrame.new(c + Vector3.new(0, -8, 0)), 16, M.LakeRadius + 4, Enum.Material.Mud)
-	terrain:FillCylinder(CFrame.new(c + Vector3.new(0, -8, 0)), 12, M.LakeRadius, Enum.Material.Water)
-	terrain:FillCylinder(CFrame.new(c + Vector3.new(0, 0, 0)), 4, M.LakeRadius, Enum.Material.Air)
-	-- 가운데 섬 (버드나무 자리)
-	terrain:FillCylinder(CFrame.new(c + Vector3.new(0, -3, 0)), 8, 15, Enum.Material.Mud)
+	terrain:FillCylinder(CFrame.new(c + Vector3.new(0, -2, 0)), 4, M.LakeRadius + M.BeachWidth + 4, Enum.Material.Sand)
+	terrain:FillCylinder(CFrame.new(c + Vector3.new(0, -10, 0)), 12, M.LakeRadius + 4, Enum.Material.Mud)
+	-- 물가 경사 + 호수 바닥: 바깥에서 안쪽으로 조금씩 더 깊게 깎아 완만한 그릇 모양을 만듦
+	local R = M.LakeRadius
+	local r = R + M.BeachWidth
+	while r > 2 do
+		local h = groundAt(r)
+		if h >= M.WaterLevel - 0.01 then
+			-- 수면 위 모래 경사: 공기로 깎음
+			terrain:FillCylinder(CFrame.new(c + Vector3.new(0, (h + 8) / 2, 0)), 8 - h, r, Enum.Material.Air)
+		else
+			-- 수면 아래: 물로 깎음 (수면 높이는 그대로)
+			terrain:FillCylinder(CFrame.new(c + Vector3.new(0, (h + M.WaterLevel) / 2, 0)), M.WaterLevel - h, r, Enum.Material.Water)
+		end
+		r -= if r > R then 1 else 2
+	end
+	-- 가운데 작은 섬 (고목 자리): 안쪽으로 갈수록 높아지는 진흙 더미
+	for ir = 10, 2, -2 do
+		local h = -6 + (10 - ir) / 8 * 6.8
+		terrain:FillCylinder(CFrame.new(c + Vector3.new(0, (h - 16) / 2, 0)), h + 16, ir, Enum.Material.Mud)
+	end
+	-- 물 외형: 어두운 밤에도 수면이 보이게 밝은 회청색 + 반사
+	terrain.WaterColor = Color3.fromRGB(62, 92, 108)
+	terrain.WaterReflectance = 1
+	terrain.WaterTransparency = 0.7
+	terrain.WaterWaveSize = 0.18
+	terrain.WaterWaveSpeed = 12
+end
+
+-- 물가 경계선: 수면 가장자리를 따라 희미한 물거품 띠 (어디까지가 물인지 보이게)
+local function buildShoreline(folder: Folder)
+	local m = Instance.new("Model")
+	m.Name = "Shoreline"
+	m.Parent = folder
+	local c = M.LakeCenter
+	local n = 64
+	local segLen = 2 * math.pi * M.LakeRadius / n + 0.6
+	for i = 1, n do
+		local a = i / n * math.pi * 2
+		local pos = c + Vector3.new(math.cos(a) * M.LakeRadius, M.WaterLevel + 0.08, math.sin(a) * M.LakeRadius)
+		local foam = Util.part({
+			Name = "Foam",
+			Size = Vector3.new(segLen, 0.08, 0.7),
+			CFrame = CFrame.new(pos) * CFrame.Angles(0, -a + math.pi / 2, 0),
+			Color = Color3.fromRGB(150, 172, 190),
+			Material = Enum.Material.Neon,
+			Transparency = 0.6,
+			CanCollide = false,
+			CanQuery = false,
+			Parent = m,
+		})
+		foam.CastShadow = false
+	end
 end
 
 ---------------------------------------------------------------- 검은 버드나무
@@ -529,17 +594,17 @@ local function buildStations(folder: Folder, info: MapInfo)
 		local markerPos: Vector3
 
 		if def.Kind == "Pier" then
-			local startP = c + dir * (R + 7)
+			-- 평지(물가 경사 시작점)에서 바로 이어지는 낮은 데크 (턱 0.3)
+			local startP = c + dir * (R + M.BeachWidth + 2)
 			local endP = c + dir * 66
-			local deck = Util.part({
+			Util.part({
 				Name = "Deck",
 				Size = Vector3.new(6, 0.6, (endP - startP).Magnitude),
-				CFrame = CFrame.lookAt((startP + endP) / 2 + Vector3.new(0, 1.2, 0), endP + Vector3.new(0, 1.2, 0)),
+				CFrame = CFrame.lookAt((startP + endP) / 2 + Vector3.new(0, 0, 0), endP),
 				Color = COL.OldWood,
 				Material = Enum.Material.WoodPlanks,
 				Parent = m,
 			})
-			deck.CFrame = deck.CFrame * CFrame.Angles(0, 0, math.rad(1.5))
 			local len = (endP - startP).Magnitude
 			local d = 4
 			while d <= len do
@@ -548,7 +613,7 @@ local function buildStations(folder: Folder, info: MapInfo)
 					Util.part({
 						Name = "Post",
 						Size = Vector3.new(0.7, 14, 0.7),
-						Position = base * Vector3.new(1, 0, 1) + Vector3.new(0, -5, 0) + side * (s - 1) * 2.6,
+						Position = base * Vector3.new(1, 0, 1) + Vector3.new(0, -6, 0) + side * (s - 1) * 2.6,
 						Color = COL.Bark,
 						Material = Enum.Material.Wood,
 						Parent = m,
@@ -573,18 +638,18 @@ local function buildStations(folder: Folder, info: MapInfo)
 				Parent = m,
 			})
 			Util.pointLight(lamp, Color3.fromRGB(220, 160, 90), 12, 0.3)
-			point = endP + Vector3.new(0, 1.5, 0)
-			markerPos = endP - dir * 1 + Vector3.new(0, 1.5, 0)
+			point = endP + Vector3.new(0, 0.45, 0)
+			markerPos = endP - dir * 1 + Vector3.new(0, 0.45, 0)
 		elseif def.Kind == "Reeds" then
 			for _ = 1, 70 do
 				local a = math.atan2(dir.Z, dir.X) + rng:NextNumber(-0.32, 0.32)
 				local r = rng:NextNumber(R - 3, R + 10)
-				local pos = c + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+				local pos = c + Vector3.new(math.cos(a) * r, groundAt(r), math.sin(a) * r)
 				local h = rng:NextNumber(4, 7.5)
 				local reed = Util.part({
 					Name = "Reed",
 					Size = Vector3.new(0.25, h, 0.25),
-					CFrame = CFrame.new(pos + Vector3.new(0, h / 2 - 1, 0))
+					CFrame = CFrame.new(pos + Vector3.new(0, h / 2 - 0.5, 0))
 						* CFrame.Angles(math.rad(rng:NextNumber(-10, 10)), rng:NextNumber(0, 6.28), math.rad(rng:NextNumber(-10, 10))),
 					Color = COL.Reed,
 					Material = Enum.Material.Grass,
@@ -594,22 +659,22 @@ local function buildStations(folder: Folder, info: MapInfo)
 				reed.CastShadow = false
 			end
 			-- 물가의 낡은 널빤지
-			point = c + dir * (R + 1.5) + Vector3.new(0, 0.3, 0)
+			point = c + dir * (R + 1.5) + Vector3.new(0, groundAt(R + 1.5) + 0.45, 0)
 			Util.part({
 				Name = "Plank",
 				Size = Vector3.new(4, 0.4, 6),
-				CFrame = CFrame.lookAt(point - Vector3.new(0, 0.2, 0) - dir * 1, point - Vector3.new(0, 0.2, 0) + dir),
+				CFrame = CFrame.lookAt(point - Vector3.new(0, 0.25, 0) - dir * 1, point - Vector3.new(0, 0.25, 0) + dir),
 				Color = COL.OldWood,
 				Material = Enum.Material.WoodPlanks,
 				Parent = m,
 			})
 			markerPos = point
 		else -- Rocks
-			local slabPos = c + dir * (R + 2)
+			local slabPos = c + dir * (R + 2) + Vector3.new(0, groundAt(R + 2), 0)
 			Util.part({
 				Name = "Slab",
-				Size = Vector3.new(10, 1.6, 12),
-				CFrame = CFrame.lookAt(slabPos + Vector3.new(0, 0.4, 0), slabPos + dir + Vector3.new(0, 0.4, 0)) * CFrame.Angles(math.rad(-3), 0, 0),
+				Size = Vector3.new(10, 1.0, 12),
+				CFrame = CFrame.lookAt(slabPos + Vector3.new(0, 0.1, 0), slabPos + dir + Vector3.new(0, 0.1, 0)) * CFrame.Angles(math.rad(-4), 0, 0),
 				Color = COL.Rock,
 				Material = Enum.Material.Slate,
 				Parent = m,
@@ -617,7 +682,7 @@ local function buildStations(folder: Folder, info: MapInfo)
 			for _ = 1, 14 do
 				local a = math.atan2(dir.Z, dir.X) + rng:NextNumber(-0.3, 0.3)
 				local r = rng:NextNumber(R - 2, R + 14)
-				local pos = c + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+				local pos = c + Vector3.new(math.cos(a) * r, groundAt(r), math.sin(a) * r)
 				local s = rng:NextNumber(2, 6)
 				Util.part({
 					Name = "Rock",
@@ -629,7 +694,7 @@ local function buildStations(folder: Folder, info: MapInfo)
 					Parent = m,
 				})
 			end
-			point = c + dir * (R - 1.5) + Vector3.new(0, 1.4, 0)
+			point = c + dir * (R + 1) + Vector3.new(0, groundAt(R + 1) + 0.85, 0)
 			markerPos = point
 		end
 
@@ -772,6 +837,7 @@ function MapBuilder.build(): MapInfo
 	info.Folder = folder
 
 	buildTerrain()
+	buildShoreline(folder)
 	buildWillow(folder)
 	buildCamp(folder, info)
 	buildAltar(folder, info)
@@ -785,7 +851,7 @@ function MapBuilder.build(): MapInfo
 	pathFolder.Parent = folder
 	for _, st in info.Stations do
 		local dir = (st.Def.Direction :: Vector3).Unit
-		local shore = M.LakeCenter + dir * (M.LakeRadius + 9)
+		local shore = M.LakeCenter + dir * (M.LakeRadius + M.BeachWidth + 1)
 		buildPath(pathFolder, M.CampCenter, shore, true)
 		buildPath(pathFolder, shore, M.AltarCenter, true)
 	end

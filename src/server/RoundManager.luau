@@ -8,6 +8,7 @@ local Net = require(script.Parent.Net)
 local PlayerState = require(script.Parent.PlayerState)
 local LanternSystem = require(script.Parent.LanternSystem)
 local TrapSystem = require(script.Parent.TrapSystem)
+local StaminaSystem = require(script.Parent.StaminaSystem)
 
 local R = Config.Round
 local gs = ReplicatedStorage.DeadLake.GameState
@@ -57,6 +58,7 @@ local function spawnPlayer(player: Player)
 		return
 	end
 	player:LoadCharacter()
+	StaminaSystem.reset(player)
 	local char = player.Character or player.CharacterAdded:Wait()
 	local root = char:WaitForChild("HumanoidRootPart", 5)
 	spawnIndex += 1
@@ -314,7 +316,7 @@ function RoundManager.init(mapInfo: any, water: any, ghost: any)
 	end
 
 	Net.on("Sprint", function(player, on)
-		player:SetAttribute("Sprinting", on == true)
+		player:SetAttribute("Sprinting", on == true and StaminaSystem.canSprint(player))
 		PlayerState.applySpeed(player)
 	end)
 

@@ -7,6 +7,7 @@ local GhostSystem = require(script.Parent.GhostSystem)
 local RoundManager = require(script.Parent.RoundManager)
 local LanternSystem = require(script.Parent.LanternSystem)
 local TrapSystem = require(script.Parent.TrapSystem)
+local StaminaSystem = require(script.Parent.StaminaSystem)
 
 local map = MapBuilder.build()
 
@@ -33,10 +34,12 @@ TrapSystem.init(map, {
 })
 
 RoundManager.init(map, WaterSystem, GhostSystem)
+StaminaSystem.init()
 
 RunService.Heartbeat:Connect(function(dt)
 	WaterSystem.update(dt)
 	GhostSystem.update(dt)
+	StaminaSystem.update(dt)
 end)
 
 RoundManager.start()
