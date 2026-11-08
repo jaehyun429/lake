@@ -58,16 +58,16 @@
       "$className": "Lighting",
       "$properties": {
         "ClockTime": 0,
-        "Brightness": 0.4,
+        "Brightness": 0.75,
         "Ambient": [
-          0.02,
-          0.023,
-          0.032
+          0.035,
+          0.04,
+          0.055
         ],
         "OutdoorAmbient": [
-          0.05,
-          0.058,
-          0.08
+          0.1,
+          0.115,
+          0.15
         ],
         "ColorShift_Top": [
           0.55,
@@ -80,17 +80,17 @@
           0.045
         ],
         "FogStart": 6,
-        "FogEnd": 115,
+        "FogEnd": 140,
         "GlobalShadows": true,
         "EnvironmentDiffuseScale": 0.15,
         "EnvironmentSpecularScale": 0.15,
-        "ExposureCompensation": -0.3,
+        "ExposureCompensation": -0.05,
         "ShadowSoftness": 0.3
       },
       "Atmosphere": {
         "$className": "Atmosphere",
         "$properties": {
-          "Density": 0.55,
+          "Density": 0.5,
           "Offset": 0.1,
           "Color": [
             0.3,

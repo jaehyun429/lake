@@ -28,10 +28,16 @@ Config.Player = {
 
 -- 랜턴 (F 로 켜고 끄기)
 Config.Lantern = {
-	Range = 26, -- 켰을 때 빛 범위 (덫이 보이는 거리)
-	Brightness = 1.6,
+	-- 앞쪽 원뿔 빛 (공포게임 손전등 구도: 화면 가운데 동그라미만 밝음). 카메라 방향을 따라감
+	Range = 42, -- 앞으로 뻗는 거리 (덫이 보이는 거리)
+	Angle = 58, -- 원뿔 각도(도). 작을수록 동그라미가 좁음
+	Brightness = 2.4,
+	-- 발밑 약한 빛 (켰을 때만). 0 이면 앞쪽만 보임
+	NearRange = 9,
+	NearBrightness = 0.35,
 	OffGlow = 0.0, -- 껐을 때 빛 (0 = 완전 암흑)
 	StartOn = false,
+	ScreenVignette = 0.3, -- 켰을 때 화면 가장자리 어둡기(0~1). 가운데 동그라미 느낌
 }
 
 -- 물 긷기

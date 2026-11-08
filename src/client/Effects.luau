@@ -1,4 +1,5 @@
 -- 위험 연출: 화면 가장자리 어두워짐, 심장박동, 경고 플래시, 끌려갈 때 화면 흔들림
+-- + 랜턴 빛: 카메라를 따라가는 원뿔 빛(앞쪽 동그라미만 밝음)과 가장자리 비네트
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +21,11 @@ local heartbeat: Sound
 local heartbeat2: Sound
 local shakeUntil = 0
 local shakeStrength = 0
+local lanternOn = false
+local lanternAlpha = 0 -- 0~1, 켜고 끌 때 부드럽게
+local beamPart: BasePart
+local beam: SpotLight
+local L = Config.Lantern
 
 local function edge(parent: Instance, pos: UDim2, size: UDim2, rotation: number): Frame
 	local f = Instance.new("Frame")
@@ -84,12 +90,62 @@ function Effects.init()
 		end
 	end)
 
-	RunService:BindToRenderStep("DeadLakeFX", Enum.RenderPriority.Camera.Value + 1, function()
+	-- 본인 화면용 원뿔 빛: 카메라 아래의 파트는 복제되지 않음(다른 사람은 머리의 빛을 봄)
+	beamPart = Instance.new("Part")
+	beamPart.Name = "LanternBeamCarrier"
+	beamPart.Size = Vector3.new(0.2, 0.2, 0.2)
+	beamPart.Transparency = 1
+	beamPart.Anchored = true
+	beamPart.CanCollide = false
+	beamPart.CanQuery = false
+	beamPart.CanTouch = false
+	beamPart.CastShadow = false
+	beam = Instance.new("SpotLight")
+	beam.Face = Enum.NormalId.Front
+	beam.Color = Color3.fromRGB(255, 190, 120)
+	beam.Angle = L.Angle
+	beam.Range = L.Range
+	beam.Brightness = 0
+	beam.Shadows = true
+	beam.Parent = beamPart
+	beamPart.Parent = camera
+
+	-- 내 머리에 붙은(다른 사람용) 빛은 내 화면에서는 끈다. 카메라 빛과 겹치면 두 배로 밝아짐
+	local function hideOwnHeadBeam(char: Model)
+		local head = char:WaitForChild("Head", 10)
+		if not head then
+			return
+		end
+		local function hide(inst: Instance)
+			if inst.Name == "LanternBeam" and inst:IsA("SpotLight") then
+				inst.Enabled = false
+			end
+		end
+		for _, c in head:GetChildren() do
+			hide(c)
+		end
+		head.ChildAdded:Connect(hide)
+	end
+	player.CharacterAdded:Connect(hideOwnHeadBeam)
+	if player.Character then
+		task.spawn(hideOwnHeadBeam, player.Character)
+	end
+
+	RunService:BindToRenderStep("DeadLakeFX", Enum.RenderPriority.Camera.Value + 1, function(dt: number)
+		-- 랜턴 빛은 카메라를 따라감 (살짝 오른쪽 아래, 손에 든 느낌)
+		local cam = workspace.CurrentCamera or camera
+		local target = if lanternOn then 1 else 0
+		lanternAlpha += math.clamp(target - lanternAlpha, -dt * 8, dt * 8)
+		beamPart.CFrame = cam.CFrame * CFrame.new(0.35, -0.4, 0.2)
+		beam.Brightness = L.Brightness * lanternAlpha
+		beam.Enabled = lanternAlpha > 0.01
+
 		local level = math.max(threat, if warning then 1 else 0)
 		local alpha = math.clamp((level - 0.2) / 0.8, 0, 1)
 		local pulse = if level > 0.6 then (math.sin(os.clock() * 6) * 0.5 + 0.5) * 0.15 else 0
+		local dark = math.min(1, alpha * 0.75 + pulse + L.ScreenVignette * lanternAlpha)
 		for _, f in vignette do
-			f.BackgroundTransparency = 1 - (alpha * 0.75 + pulse)
+			f.BackgroundTransparency = 1 - dark
 		end
 		if os.clock() < shakeUntil then
 			local s = shakeStrength
@@ -101,6 +157,10 @@ end
 
 function Effects.setThreat(value: number)
 	threat = value
+end
+
+function Effects.setLantern(on: boolean)
+	lanternOn = on
 end
 
 function Effects.setWarning(on: boolean)

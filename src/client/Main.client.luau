@@ -74,12 +74,15 @@ player:GetAttributeChangedSignal("Stamina"):Connect(function()
 	HUD.setStamina((player:GetAttribute("Stamina") :: number?) or 1)
 end)
 player:GetAttributeChangedSignal("LanternOn"):Connect(function()
-	HUD.setLantern(player:GetAttribute("LanternOn") == true)
+	local on = player:GetAttribute("LanternOn") == true
+	HUD.setLantern(on)
+	Effects.setLantern(on)
 end)
 player:GetAttributeChangedSignal("Carrying"):Connect(function()
 	HUD.setCarrying(player:GetAttribute("Carrying") == true)
 end)
 HUD.setLantern(player:GetAttribute("LanternOn") == true)
+Effects.setLantern(player:GetAttribute("LanternOn") == true)
 
 ---------------------------------------------------------------- 서버 메시지
 local function playUi(id: string, volume: number, pitch: number)

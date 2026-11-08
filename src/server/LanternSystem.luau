@@ -56,19 +56,47 @@ local function buildTool(): Tool
 		w.Part1 = p
 		w.Parent = p
 	end
+	-- 발밑 약한 빛. 앞쪽 원뿔 빛은 머리(다른 플레이어용)와 카메라(본인용, 클라이언트)에 붙는다
 	local light = Instance.new("PointLight")
 	light.Name = "Light"
 	light.Color = Color3.fromRGB(255, 185, 110)
-	light.Range = L.Range
+	light.Range = L.NearRange
 	light.Brightness = 0
-	light.Shadows = true
+	light.Shadows = false
 	light.Parent = handle
 	return tool
+end
+
+-- 다른 플레이어 눈에 보이는 원뿔 빛. 머리 앞면에서 나감 (본인 화면에서는 클라이언트가 끄고 카메라 빛을 씀)
+local function headBeam(char: Model?): SpotLight?
+	local head = char and char:FindFirstChild("Head") :: BasePart?
+	if not head then
+		return nil
+	end
+	local beam = head:FindFirstChild("LanternBeam") :: SpotLight?
+	if not beam then
+		beam = Instance.new("SpotLight")
+		beam.Name = "LanternBeam"
+		beam.Face = Enum.NormalId.Front
+		beam.Color = Color3.fromRGB(255, 190, 120)
+		beam.Angle = L.Angle
+		beam.Range = L.Range
+		beam.Brightness = 0
+		beam.Shadows = true
+		beam.Parent = head
+	end
+	return beam
 end
 
 local function applyState(player: Player, on: boolean)
 	player:SetAttribute("LanternOn", on)
 	local char = player.Character
+	local beam = headBeam(char)
+	if beam then
+		beam.Brightness = if on then L.Brightness else L.OffGlow
+		beam.Angle = L.Angle
+		beam.Range = L.Range
+	end
 	local tool = char and char:FindFirstChild("랜턴") or player.Backpack:FindFirstChild("랜턴")
 	if not tool then
 		return
@@ -77,8 +105,8 @@ local function applyState(player: Player, on: boolean)
 	local light = handle and handle:FindFirstChild("Light") :: PointLight?
 	local glass = tool:FindFirstChild("Glass") :: BasePart?
 	if light then
-		light.Brightness = if on then L.Brightness else L.OffGlow
-		light.Range = L.Range
+		light.Brightness = if on then L.NearBrightness else 0
+		light.Range = L.NearRange
 	end
 	if glass then
 		glass.Transparency = if on then 0.1 else 0.9
