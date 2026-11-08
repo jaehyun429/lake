@@ -1,0 +1,7 @@
+.DS_Store
+# Meshy 원본(FBX·4K 텍스처, 250MB). 로블록스용 변환본은 assets/import/ 에 있음
+assets/DeadTree/
+assets/Wraith/
+assets/Bucket/
+assets/Jar/
+assets/raw_obj/
