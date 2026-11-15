@@ -12,7 +12,7 @@ type FillState = { Station: any, StartPos: Vector3, Progress: number, Active: bo
 
 local WaterSystem = {}
 local map: any
-local ctx: { isPlaying: () -> boolean, onDelivered: (Player) -> () }
+local ctx: { isPlaying: () -> boolean, onDelivered: (Player, any) -> boolean }
 local fills: { [Player]: FillState } = {}
 
 local function stopFilling(player: Player, f: FillState?)
@@ -165,7 +165,7 @@ function WaterSystem.toggleFill(player: Player, st: any)
 	Net.notify(player, string.format("%s에서 물을 긷는 중... 가만히 서 있으세요", st.Name), 2.5)
 end
 
-function WaterSystem.tryDeliver(player: Player)
+function WaterSystem.tryDeliver(player: Player, shrine: any)
 	if not ctx.isPlaying() or not PlayerState.isAlive(player) then
 		return
 	end
@@ -174,13 +174,18 @@ function WaterSystem.tryDeliver(player: Player)
 		return
 	end
 	local root = PlayerState.getRoot(player)
-	if not root or (root.Position - map.Altar.Position).Magnitude > 12 then
+	local vessel = shrine.Vessel :: BasePart
+	if not root or (root.Position - vessel.Position).Magnitude > 12 then
+		return
+	end
+	-- 이미 가득 찬 항아리면 양동이를 그대로 들고 있음
+	if not ctx.onDelivered(player, shrine) then
+		Net.notify(player, shrine.Name .. "은(는) 이미 채워졌습니다. 다른 항아리를 찾으세요.", 2.5)
 		return
 	end
 	WaterSystem.dropBucket(player, false)
-	Util.playAt(map.Altar.Position, Config.Sounds.Pour, 0.8, 1.1)
+	Util.playAt(vessel.Position, Config.Sounds.Pour, 0.8, 1.1)
 	Net.send(player, "Sfx", "Pour")
-	ctx.onDelivered(player)
 end
 
 function WaterSystem.resetPlayer(player: Player)
@@ -235,9 +240,11 @@ function WaterSystem.init(mapInfo: any, context: typeof(ctx))
 			WaterSystem.toggleFill(player, st)
 		end)
 	end
-	map.AltarPrompt.Triggered:Connect(function(player: Player)
-		WaterSystem.tryDeliver(player)
-	end)
+	for _, shrine in map.Shrines do
+		shrine.Prompt.Triggered:Connect(function(player: Player)
+			WaterSystem.tryDeliver(player, shrine)
+		end)
+	end
 	Net.on("DropBucket", function(player)
 		if PlayerState.isAlive(player) and player:GetAttribute("Carrying") == true then
 			WaterSystem.dropBucket(player, true)

@@ -165,8 +165,14 @@ function TrapSystem.spawn(count: number)
 		local t = rng:NextNumber(0.08, 0.92)
 		local pos = a:Lerp(b, t) + side * rng:NextNumber(-T.PathSpread, T.PathSpread)
 		local ok = (pos - M.CampCenter * Vector3.new(1, 0, 1)).Magnitude > M.SafeRadius + 6
-			and (pos - M.AltarCenter * Vector3.new(1, 0, 1)).Magnitude > 14
 			and ((pos - M.LakeCenter) * Vector3.new(1, 0, 1)).Magnitude > M.LakeRadius + 6
+		if ok then
+			for _, sh in M.Shrines do
+				if (pos - sh.Position * Vector3.new(1, 0, 1)).Magnitude < 14 then
+					ok = false
+				end
+			end
+		end
 		if ok then
 			for _, st in map.Stations do
 				if ((st.Point - pos) * Vector3.new(1, 0, 1)).Magnitude < 10 then

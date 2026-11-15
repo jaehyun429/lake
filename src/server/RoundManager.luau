@@ -1,4 +1,6 @@
--- 라운드 루프: 대기 → 라운드(물 긷기) → 탈출 → 결과
+-- 진행 관리: 라운드·대기·제한시간 없음.
+-- 플레이어가 들어오면 바로 캠프에서 시작 → 호수 주변 항아리 3개를 채우면 귀신 봉인 → 문 열림 → 탈출.
+-- 탈출 성공 또는 전원 사망이면 결과 화면 뒤 맵을 되돌리고 전원 캠프에서 다시 시작.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,11 +20,11 @@ local map: any
 local Water: any
 local Ghost: any
 
+-- Waiting(아무도 없음) → Playing → Sealing → Escape → Ended → Playing ...
 local phase = "Waiting"
 local timeLeft = 0
-local roundElapsed = 0
-local delivered = 0
-local target = 0
+local filledCount = 0
+local jarFill: { [number]: number } = {} -- 사당 인덱스 → 부은 양동이 수
 local spawnIndex = 0
 
 local function setPhase(p: string)
@@ -35,18 +37,45 @@ local function setTime(t: number)
 	gs:SetAttribute("TimeLeft", math.max(0, math.ceil(t)))
 end
 
-local function setBuckets()
-	gs:SetAttribute("Buckets", delivered)
-	gs:SetAttribute("Target", target)
-	map.AltarLabel.Text = string.format("제단 %d / %d", delivered, target)
-	local ratio = if target > 0 then delivered / target else 0
-	local water = map.AltarWater :: BasePart
-	local c = Config.Map.AltarCenter
-	local y = map.AltarWaterMinY + ratio * (map.AltarWaterMaxY - map.AltarWaterMinY)
-	Util.tween(water, 1.2, { Position = Vector3.new(c.X, y, c.Z) }, Enum.EasingStyle.Sine)
-	for _, light in map.AltarCandles do
-		Util.tween(light, 1.2, { Brightness = ratio * 1.8 }, Enum.EasingStyle.Sine)
+local function target(): number
+	return #map.Shrines
+end
+
+local function isFull(shrine: any): boolean
+	return (jarFill[shrine.Index] or 0) >= R.BucketsPerJar
+end
+
+local function refreshShrine(shrine: any, animate: boolean)
+	local n = jarFill[shrine.Index] or 0
+	local ratio = math.clamp(n / R.BucketsPerJar, 0, 1)
+	local water = shrine.Water :: BasePart
+	local c = shrine.Center :: Vector3
+	local y = shrine.WaterMinY + ratio * (shrine.WaterMaxY - shrine.WaterMinY)
+	if R.BucketsPerJar > 1 then
+		shrine.Label.Text = string.format("%s  %d / %d", shrine.Name, n, R.BucketsPerJar)
+	else
+		shrine.Label.Text = if ratio >= 1 then shrine.Name .. " - 채워짐" else shrine.Name .. " - 비어 있음"
 	end
+	shrine.Label.TextColor3 = if ratio >= 1 then Color3.fromRGB(170, 215, 255) else Color3.fromRGB(150, 185, 230)
+	if animate then
+		Util.tween(water, 1.2, { Position = Vector3.new(c.X, y, c.Z) }, Enum.EasingStyle.Sine)
+		for _, light in shrine.Candles do
+			Util.tween(light, 1.2, { Brightness = ratio * 1.8 }, Enum.EasingStyle.Sine)
+		end
+	else
+		water.Position = Vector3.new(c.X, y, c.Z)
+		water.Color = Color3.fromRGB(40, 90, 120)
+		water.Transparency = 0.25
+		for _, light in shrine.Candles do
+			light.Brightness = ratio * 1.8
+			light.Range = 6
+		end
+	end
+end
+
+local function publishProgress()
+	gs:SetAttribute("Buckets", filledCount)
+	gs:SetAttribute("Target", target())
 end
 
 function RoundManager.isPlaying(): boolean
@@ -113,7 +142,7 @@ local function setGate(open: boolean)
 	end
 end
 
-local function endRound(win: boolean, reason: string)
+local function endRun(win: boolean, reason: string)
 	if phase == "Ended" then
 		return
 	end
@@ -129,21 +158,20 @@ local function checkEnd()
 	local alive = countStatus("Alive", "Grabbed")
 	local escaped = countStatus("Escaped")
 	if phase == "Playing" then
-		if timeLeft <= 0 then
-			endRound(false, "새벽이 오기 전에 제단을 채우지 못했습니다.")
-		elseif alive == 0 then
-			endRound(false, "모두 살목지에 삼켜졌습니다.")
+		if alive == 0 then
+			endRun(false, "모두 살목지에 삼켜졌습니다.")
 		end
 	elseif phase == "Sealing" then
 		if alive == 0 then
-			endRound(false, "봉인은 됐지만 아무도 남지 않았습니다.")
+			endRun(false, "봉인은 됐지만 아무도 남지 않았습니다.")
 		end
 	elseif phase == "Escape" then
-		if alive == 0 or timeLeft <= 0 then
+		local timeUp = R.EscapeTime > 0 and timeLeft <= 0
+		if alive == 0 or timeUp then
 			if escaped > 0 then
-				endRound(true, string.format("%d명이 살아서 돌아왔습니다.", escaped))
+				endRun(true, string.format("%d명이 살아서 돌아왔습니다.", escaped))
 			else
-				endRound(false, "아무도 출구를 넘지 못했습니다.")
+				endRun(false, "아무도 출구를 넘지 못했습니다.")
 			end
 		end
 	end
@@ -160,13 +188,14 @@ end
 local function sealGhost()
 	setPhase("Sealing")
 	Ghost.seal()
-	Net.notifyAll("제단이 가득 찼다... 호수가 울부짖는다!", 4)
+	Net.notifyAll("항아리가 모두 찼다... 호수가 울부짖는다!", 4)
 	Net.broadcast("Sfx", "Seal")
-	-- 촛불이 강하게 타오름
-	for _, light in map.AltarCandles do
-		Util.tween(light, 0.5, { Brightness = 6, Range = 14 }, Enum.EasingStyle.Quad)
+	for _, shrine in map.Shrines do
+		for _, light in shrine.Candles do
+			Util.tween(light, 0.5, { Brightness = 6, Range = 14 }, Enum.EasingStyle.Quad)
+		end
+		Util.tween(shrine.Water, 1.5, { Color = Color3.fromRGB(120, 180, 255), Transparency = 0 })
 	end
-	Util.tween(map.AltarWater, 1.5, { Color = Color3.fromRGB(120, 180, 255), Transparency = 0 })
 	task.delay(3.5, function()
 		if phase == "Sealing" then
 			beginEscape()
@@ -174,16 +203,24 @@ local function sealGhost()
 	end)
 end
 
-function RoundManager.onDelivered(player: Player)
-	if phase ~= "Playing" then
-		return
+-- 물을 부었을 때. 이미 가득 찬 항아리면 false (양동이는 그대로)
+function RoundManager.onDelivered(player: Player, shrine: any): boolean
+	if phase ~= "Playing" or isFull(shrine) then
+		return false
 	end
-	delivered += 1
-	setBuckets()
-	Net.notifyAll(string.format("%s님이 제단에 물을 부었습니다. (%d / %d)", player.DisplayName, delivered, target), 3)
-	if delivered >= target then
-		sealGhost()
+	jarFill[shrine.Index] = (jarFill[shrine.Index] or 0) + 1
+	refreshShrine(shrine, true)
+	if isFull(shrine) then
+		filledCount += 1
+		publishProgress()
+		Net.notifyAll(string.format("%s님이 %s을(를) 채웠습니다. (%d / %d)", player.DisplayName, shrine.Name, filledCount, target()), 3)
+		if filledCount >= target() then
+			sealGhost()
+		end
+	else
+		Net.notify(player, string.format("%s  %d / %d", shrine.Name, jarFill[shrine.Index], R.BucketsPerJar), 2)
 	end
+	return true
 end
 
 function RoundManager.onPlayerDied(_player: Player)
@@ -206,59 +243,43 @@ local function onEscaped(player: Player)
 	end)
 end
 
-local function startRound()
-	delivered = 0
-	roundElapsed = 0
-	local players = Players:GetPlayers()
-	target = math.clamp(R.BucketTargetBase + R.BucketTargetPerPlayer * #players, R.BucketTargetMin, R.BucketTargetMax)
+-- 맵을 처음 상태로 되돌리고 모든 플레이어를 캠프에 세움
+local function startRun()
+	filledCount = 0
+	table.clear(jarFill)
 	gs:SetAttribute("Result", "")
 	gs:SetAttribute("Reason", "")
-	setBuckets()
+	for _, shrine in map.Shrines do
+		refreshShrine(shrine, false)
+	end
+	publishProgress()
 	setGate(false)
 	Ghost.resetAll()
 	Water.resetAll()
+	TrapSystem.clear()
+	local players = Players:GetPlayers()
 	TrapSystem.spawn(Config.Traps.Base + Config.Traps.PerPlayer * #players)
 	spawnIndex = 0
 	for _, p in players do
 		PlayerState.setStatus(p, "Alive")
 		task.spawn(spawnPlayer, p)
 	end
-	setTime(R.RoundTime)
+	setTime(0)
 	setPhase("Playing")
 	Net.notifyAll(
 		string.format(
-			"호수에서 물을 길어 반대편 제단을 채우세요. 목표: 양동이 %d개. 랜턴(F)을 켜면 덫이 보이지만 귀신에게 발각됩니다.",
-			target
+			"호수에서 물을 길어 주변 항아리 %d개를 채우세요. 랜턴(F)을 켜면 덫이 보이지만 귀신에게 발각됩니다.",
+			target()
 		),
 		8
 	)
 end
 
-local function intermission()
-	setPhase("Intermission")
-	gs:SetAttribute("Result", "")
-	Ghost.resetAll()
-	Water.resetAll()
-	TrapSystem.clear()
-	map.AltarWater.Color = Color3.fromRGB(40, 90, 120)
-	map.AltarWater.Transparency = 0.25
-	for _, light in map.AltarCandles do
-		light.Brightness = 0
-		light.Range = 6
-	end
-	for _, p in Players:GetPlayers() do
-		PlayerState.setStatus(p, "Lobby")
-		if not p.Character or not p.Character.Parent then
-			task.spawn(spawnPlayer, p)
-		end
-	end
-	local t = R.IntermissionTime
-	setTime(t)
-	while t > 0 do
-		task.wait(1)
-		t -= 1
-		setTime(t)
-	end
+-- 진행 중 들어온 플레이어: 기다리지 않고 바로 캠프에서 합류
+local function joinRun(player: Player)
+	PlayerState.setStatus(player, "Alive")
+	task.spawn(spawnPlayer, player)
+	Net.notify(player, "밤이 이미 시작됐습니다. 캠프에서 합류합니다.", 4)
 end
 
 function RoundManager.start()
@@ -268,19 +289,16 @@ function RoundManager.start()
 				setPhase("Waiting")
 				task.wait(1)
 			end
-			intermission()
-			if #Players:GetPlayers() < R.MinPlayers then
-				continue
-			end
-			startRound()
+			startRun()
 			local last = os.clock()
 			while RoundManager.isPlaying() do
 				task.wait(0.2)
 				local now = os.clock()
 				local dt = now - last
 				last = now
-				roundElapsed += dt
-				setTime(timeLeft - dt)
+				if phase == "Escape" and R.EscapeTime > 0 then
+					setTime(timeLeft - dt)
+				end
 				checkEnd()
 			end
 			task.wait(R.EndingTime)
@@ -296,7 +314,7 @@ function RoundManager.init(mapInfo: any, water: any, ghost: any)
 	setPhase("Waiting")
 	gs:SetAttribute("TimeLeft", 0)
 	gs:SetAttribute("Buckets", 0)
-	gs:SetAttribute("Target", 0)
+	gs:SetAttribute("Target", target())
 	gs:SetAttribute("Result", "")
 	gs:SetAttribute("Reason", "")
 
@@ -304,11 +322,12 @@ function RoundManager.init(mapInfo: any, water: any, ghost: any)
 		PlayerState.setStatus(player, "Lobby")
 		player:SetAttribute("Threat", 0)
 		player:SetAttribute("Fill", 0)
-		if not RoundManager.isPlaying() then
-			task.spawn(spawnPlayer, player)
-		else
-			Net.notify(player, "라운드가 진행 중입니다. 다음 판까지 관전합니다.", 5)
+		if RoundManager.isPlaying() then
+			joinRun(player)
+		elseif phase == "Ended" then
+			Net.notify(player, "밤이 끝나는 중입니다. 잠시 뒤 캠프에서 시작합니다.", 4)
 		end
+		-- Waiting 이면 루프가 곧 startRun 으로 스폰시킴
 	end
 	Players.PlayerAdded:Connect(onPlayer)
 	for _, p in Players:GetPlayers() do

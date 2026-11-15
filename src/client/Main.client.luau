@@ -39,7 +39,7 @@ local function refreshState()
 		end
 	end
 	local status = (player:GetAttribute("Status") :: string?) or "Lobby"
-	local spectating = (phase == "Playing" or phase == "Escape") and (status == "Dead" or status == "Escaped")
+	local spectating = (phase == "Playing" or phase == "Sealing" or phase == "Escape") and (status == "Dead" or status == "Escaped")
 	Spectate.setActive(spectating)
 end
 for _, name in { "Phase", "TimeLeft", "Buckets", "Target", "Result" } do

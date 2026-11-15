@@ -76,7 +76,7 @@ function HUD.init()
 	bucketLabel = label(top, {
 		Size = UDim2.new(1, 0, 0, 24),
 		Position = UDim2.fromOffset(0, 44),
-		Text = "양동이 0 / 0",
+		Text = "항아리 0 / 3",
 		TextSize = 18,
 		TextColor3 = Color3.fromRGB(150, 195, 225),
 	})
@@ -205,31 +205,49 @@ function HUD.init()
 		TextSize = 14,
 		TextWrapped = true,
 		TextColor3 = Color3.fromRGB(180, 180, 170),
-		Text = "[F] 랜턴 켜기/끄기 - 켜면 덫이 보이지만 귀신에게 발각됩니다\n[E] 물가에서 물 긷기 / 제단 앞에서 길게 눌러 붓기\n[Shift] 달리기(소음)   [G] 양동이 버리기(귀신에게 쫓길 때)\n제단을 다 채우면 귀신이 봉인되고 캠프 출구가 열립니다.",
+		Text = "[F] 랜턴 켜기/끄기 - 켜면 덫이 보이지만 귀신에게 발각됩니다\n[E] 물가에서 물 긷기 / 항아리 앞에서 길게 눌러 붓기\n[Shift] 달리기(소음)   [G] 양동이 버리기(귀신에게 쫓길 때)\n호수 주변 항아리 세 개를 채우면 귀신이 봉인되고 캠프 출구가 열립니다.",
 	})
 end
 
+-- 타이머는 탈출 제한시간이 있을 때만 숫자를 보임. 그 외에는 밤 표시
 function HUD.setTimer(seconds: number)
 	local s = math.max(0, math.floor(seconds))
+	if s <= 0 then
+		timerLabel.Text = "살목지의 밤"
+		timerLabel.TextSize = 24
+		timerLabel.TextColor3 = Color3.fromRGB(200, 200, 190)
+		return
+	end
+	timerLabel.TextSize = 34
 	timerLabel.Text = string.format("%02d:%02d", s // 60, s % 60)
 	timerLabel.TextColor3 = if s <= 30 then Color3.fromRGB(240, 90, 80) else Color3.fromRGB(225, 225, 215)
 end
 
 function HUD.setBuckets(n: number, target: number)
-	bucketLabel.Text = string.format("양동이 %d / %d", n, target)
+	bucketLabel.Text = string.format("항아리 %d / %d", n, target)
 end
 
+local helpToken = 0
 function HUD.setPhase(phase: string)
 	local names = {
 		Waiting = "플레이어 대기 중",
-		Intermission = "다음 판 준비 중",
-		Playing = "호수의 물로 제단을 채우세요",
+		Playing = "호수의 물로 항아리 세 개를 채우세요",
 		Sealing = "봉인 중...",
 		Escape = "봉인 완료! 캠프 출구로 탈출하세요",
-		Ended = "라운드 종료",
+		Ended = "밤이 끝났다",
 	}
 	phaseLabel.Text = names[phase] or phase
-	helpLabel.Visible = phase == "Intermission" or phase == "Waiting"
+	-- 도움말: 대기 중이거나 시작 후 15초 동안
+	helpToken += 1
+	local token = helpToken
+	helpLabel.Visible = phase == "Waiting" or phase == "Playing"
+	if phase == "Playing" then
+		task.delay(15, function()
+			if token == helpToken then
+				helpLabel.Visible = false
+			end
+		end)
+	end
 	if phase ~= "Ended" then
 		resultFrame.Visible = false
 	end

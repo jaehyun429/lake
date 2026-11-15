@@ -4,16 +4,12 @@
 
 local Config = {}
 
+-- 진행: 라운드·대기·제한시간 없음. 들어오면 바로 캠프에서 시작, 호수 주변 항아리 3개를 채우면 귀신 봉인 → 문 열림 → 탈출.
 Config.Round = {
-	IntermissionTime = 20,
-	RoundTime = 420, -- 7분
-	EscapeTime = 90, -- 봉인 후 탈출 제한 시간
-	EndingTime = 8,
+	EscapeTime = 90, -- 봉인 후 문이 열려 있는 시간. 0 이면 제한 없음
+	EndingTime = 8, -- 결과 화면 시간. 지나면 맵을 되돌리고 전원 캠프에서 다시 시작
 	MinPlayers = 1,
-	BucketTargetBase = 2, -- 목표 양동이 = Base + PerPlayer * 인원 (Min~Max)
-	BucketTargetPerPlayer = 1,
-	BucketTargetMin = 3,
-	BucketTargetMax = 10,
+	BucketsPerJar = 1, -- 항아리 하나를 채우는 데 필요한 양동이 수
 }
 
 Config.Player = {
@@ -99,7 +95,12 @@ Config.Map = {
 	CampCenter = Vector3.new(0, 0, 150), -- 출발점·안전지대·출구
 	SafeRadius = 28,
 	GatePosition = Vector3.new(0, 0, 195),
-	AltarCenter = Vector3.new(0, 0, -168), -- 호수 반대편 제단
+	-- 채워야 하는 항아리(사당) 3곳. 호수 주변에 흩어져 있고 길로 이어짐. 전부 채우면 봉인.
+	Shrines = {
+		{ Name = "건너편 제단", Position = Vector3.new(0, 0, -168), Pillars = 8 },
+		{ Name = "서쪽 돌탑", Position = Vector3.new(-160, 0, -40), Pillars = 4 },
+		{ Name = "동쪽 무너진 사당", Position = Vector3.new(160, 0, 10), Pillars = 5 },
+	},
 	-- 물을 뜰 수 있는 지점 3곳. FillMult: 긷는 속도 (선착장은 귀신 코앞이라 빠름)
 	Stations = {
 		{ Name = "낡은 선착장", Kind = "Pier", Direction = Vector3.new(0, 0, 1), FillMult = 1.4 },

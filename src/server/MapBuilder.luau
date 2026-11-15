@@ -1,4 +1,4 @@
--- 살목지 맵 생성기. 서버 시작 시 지형·호수·검은 버드나무·캠프·물가 3곳·출구를 코드로 만듭니다.
+-- 살목지 맵 생성기. 서버 시작 시 지형·호수·검은 버드나무·캠프·물가 3곳·항아리 사당 3곳·출구를 코드로 만듭니다.
 -- Studio 편집 모드에서 미리 보고 싶으면 명령줄에서:
 --   require(game.ServerScriptService.DeadLake.MapBuilder).build()
 local Workspace = game:GetService("Workspace")
@@ -34,16 +34,23 @@ export type Station = {
 	Marker: BasePart,
 }
 
+export type Shrine = {
+	Index: number,
+	Name: string,
+	Center: Vector3,
+	Vessel: BasePart,
+	Prompt: ProximityPrompt,
+	Label: TextLabel,
+	Water: BasePart,
+	WaterMinY: number,
+	WaterMaxY: number,
+	Candles: { PointLight },
+}
+
 export type MapInfo = {
 	Folder: Folder,
 	Stations: { Station },
-	Altar: BasePart,
-	AltarPrompt: ProximityPrompt,
-	AltarLabel: TextLabel,
-	AltarWater: BasePart,
-	AltarWaterMinY: number,
-	AltarWaterMaxY: number,
-	AltarCandles: { PointLight },
+	Shrines: { Shrine },
 	PathSegments: { { Vector3 } }, -- {a, b} 덫 배치용 길 중심선
 	GatePanel: BasePart,
 	ExitZone: BasePart,
@@ -362,10 +369,10 @@ local function buildCamp(folder: Folder, info: MapInfo)
 end
 
 ---------------------------------------------------------------- 제단 (납품·봉인 지점)
-local function buildAltar(folder: Folder, info: MapInfo)
-	local c = M.AltarCenter
+local function buildShrine(folder: Folder, index: number, def: any): Shrine
+	local c = def.Position :: Vector3
 	local altar = Instance.new("Model")
-	altar.Name = "Altar"
+	altar.Name = "Shrine" .. index
 	altar.Parent = folder
 
 	-- 돌바닥 (단차 없이 땅과 거의 같은 높이. 안쪽은 색만 다름)
@@ -416,7 +423,7 @@ local function buildAltar(folder: Folder, info: MapInfo)
 		waterDiameter = 6
 	end
 	local water = Util.part({
-		Name = "AltarWater",
+		Name = "JarWater",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(0.2, waterDiameter, waterDiameter),
 		CFrame = CFrame.new(Vector3.new(c.X, waterMinY, c.Z)) * CFrame.Angles(0, 0, math.rad(90)),
@@ -437,17 +444,21 @@ local function buildAltar(folder: Folder, info: MapInfo)
 		Parent = altar,
 	})
 	local candles = {}
+	local pillars = (def.Pillars :: number?) or 6
 	for i = 1, 8 do
 		local a = i / 8 * math.pi * 2
 		local pos = c + Vector3.new(math.cos(a) * 16, 0, math.sin(a) * 16)
-		Util.part({
-			Name = "Pillar",
-			Size = Vector3.new(2, rng:NextNumber(5, 9), 2),
-			Position = pos + Vector3.new(0, 3.5, 0),
-			Color = Color3.fromRGB(40, 40, 44),
-			Material = Enum.Material.Slate,
-			Parent = altar,
-		})
+		if i <= pillars then
+			local ph = rng:NextNumber(5, 9)
+			Util.part({
+				Name = "Pillar",
+				Size = Vector3.new(2, ph, 2),
+				CFrame = CFrame.new(pos + Vector3.new(0, ph / 2 - 0.5, 0)) * CFrame.Angles(math.rad(rng:NextNumber(-3, 3)), 0, math.rad(rng:NextNumber(-3, 3))),
+				Color = Color3.fromRGB(40, 40, 44),
+				Material = Enum.Material.Slate,
+				Parent = altar,
+			})
+		end
 		local candle = Util.part({
 			Name = "Candle",
 			Size = Vector3.new(0.4, 0.8, 0.4),
@@ -462,21 +473,33 @@ local function buildAltar(folder: Folder, info: MapInfo)
 	end
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "물 붓기"
-	prompt.ObjectText = "제단"
+	prompt.ObjectText = def.Name
 	prompt.HoldDuration = 0.8
 	prompt.MaxActivationDistance = 9
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = vessel
-	local label = Util.billboard(vessel, "제단 0 / 0", 5, UDim2.fromOffset(220, 46))
+	local label = Util.billboard(vessel, def.Name .. " - 비어 있음", 5, UDim2.fromOffset(260, 46))
 	label.TextColor3 = Color3.fromRGB(150, 185, 230)
 
-	info.Altar = vessel
-	info.AltarWaterMinY = waterMinY
-	info.AltarWaterMaxY = waterMaxY
-	info.AltarPrompt = prompt
-	info.AltarLabel = label
-	info.AltarWater = water
-	info.AltarCandles = candles
+	return {
+		Index = index,
+		Name = def.Name,
+		Center = c,
+		Vessel = vessel,
+		Prompt = prompt,
+		Label = label,
+		Water = water,
+		WaterMinY = waterMinY,
+		WaterMaxY = waterMaxY,
+		Candles = candles,
+	}
+end
+
+local function buildShrines(folder: Folder, info: MapInfo)
+	info.Shrines = {}
+	for i, def in M.Shrines do
+		table.insert(info.Shrines, buildShrine(folder, i, def))
+	end
 end
 
 ---------------------------------------------------------------- 출구 문 + 울타리
@@ -755,7 +778,12 @@ local function buildForest(folder: Folder)
 		local a = rng:NextNumber(0, math.pi * 2)
 		local r = rng:NextNumber(M.LakeRadius + 28, 330)
 		local pos = c + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
-		local ok = (flat(pos) - flat(camp)).Magnitude > 48 and (flat(pos) - flat(M.AltarCenter)).Magnitude > 34
+		local ok = (flat(pos) - flat(camp)).Magnitude > 48
+		for _, sh in M.Shrines do
+			if (flat(pos) - flat(sh.Position)).Magnitude < 34 then
+				ok = false
+			end
+		end
 		if ok and pos.Z > M.GatePosition.Z - 8 and math.abs(pos.X) < 14 then
 			ok = false -- 문 뒤의 길 비워둠
 		end
@@ -821,6 +849,18 @@ local function buildForest(folder: Folder)
 	end
 end
 
+-- a→b 직선이 (출발점 근처를 제외하고) 호수 모래 경사 안쪽으로 들어가지 않는지
+local function clearOfLake(a: Vector3, b: Vector3): boolean
+	local limit = M.LakeRadius + M.BeachWidth + 2
+	for i = 3, 20 do
+		local pnt = a:Lerp(b, i / 20)
+		if (pnt - flat(M.LakeCenter)).Magnitude < limit then
+			return false
+		end
+	end
+	return true
+end
+
 ---------------------------------------------------------------- 빌드
 function MapBuilder.build(): MapInfo
 	local old = Workspace:FindFirstChild("DeadLake")
@@ -844,20 +884,42 @@ function MapBuilder.build(): MapInfo
 	buildShoreline(folder)
 	buildWillow(folder)
 	buildCamp(folder, info)
-	buildAltar(folder, info)
+	buildShrines(folder, info)
 	buildGate(folder, info)
 	buildStations(folder, info)
 
-	-- 길: 캠프 → 각 물가, 각 물가 → 제단, 캠프 → 출구. (숲보다 먼저 만들어 나무가 길을 피하게)
+	-- 길: 캠프 → 각 물가, 각 물가 → 가장 가까운 사당, 사당끼리 호수를 도는 고리, 캠프 → 출구.
+	-- (숲보다 먼저 만들어 나무가 길을 피하게)
 	table.clear(pathSegments)
 	local pathFolder = Instance.new("Folder")
 	pathFolder.Name = "Paths"
 	pathFolder.Parent = folder
+	local shrinePos: { Vector3 } = {}
+	for _, sh in M.Shrines do
+		table.insert(shrinePos, flat(sh.Position))
+	end
 	for _, st in info.Stations do
 		local dir = (st.Def.Direction :: Vector3).Unit
 		local shore = M.LakeCenter + dir * (M.LakeRadius + M.BeachWidth + 1)
 		buildPath(pathFolder, M.CampCenter, shore, true)
-		buildPath(pathFolder, shore, M.AltarCenter, true)
+		local nearest, best = nil, math.huge
+		for _, sp in shrinePos do
+			local d = (sp - flat(shore)).Magnitude
+			if d < best then
+				nearest, best = sp, d
+			end
+		end
+		-- 길이 호수·모래 경사를 가로지르면(물가 바로 옆 선착장 등) 만들지 않음. 다른 물가의 길과 사당 고리로 이어짐
+		if nearest and clearOfLake(flat(shore), nearest) then
+			buildPath(pathFolder, shore, nearest, true)
+		end
+	end
+	-- 사당 고리: 호수 중심 기준 각도 순으로 이웃을 이음
+	table.sort(shrinePos, function(p, q)
+		return math.atan2(p.Z - M.LakeCenter.Z, p.X - M.LakeCenter.X) < math.atan2(q.Z - M.LakeCenter.Z, q.X - M.LakeCenter.X)
+	end)
+	for i = 1, #shrinePos - 1 do
+		buildPath(pathFolder, shrinePos[i], shrinePos[i + 1], true)
 	end
 	buildPath(pathFolder, M.CampCenter, M.GatePosition, false)
 	info.PathSegments = pathSegments
