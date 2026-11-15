@@ -81,7 +81,8 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 | 파일 | 쓰이는 곳 | 삼각형 |
 |---|---|---|
 | `DeadTree.obj` | 호수 가운데 고목 + 숲 나무 일부 | 18,000 |
-| `Wraith.obj` | 귀신 몸 (정적 메시, 애니메이션 없음) | 18,000 |
+| `WraithRig.fbx` | **귀신 몸 + 리그 + 달리기 애니메이션** (Mixamo 뼈 48개, 스킨 메시) | 9,310 |
+| `Wraith.obj` | 귀신 몸 정적 버전 (리그 임포트가 안 될 때 대체) | 18,000 |
 | `Bucket.obj` | 들고 다니는 양동이 + 물가 소품 | 8,000 |
 | `Jar.obj` | 사당 항아리 3개 (물 붓는 곳) | 9,500 |
 
@@ -90,8 +91,17 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 3. Play 하면 코드가 자동으로 찾아 씁니다. 없는 것은 기존 파트 외형으로 나옵니다.
    크기·방향은 `Config.Assets` 에서 조정 (`WraithFacing`: 귀신이 뒤로 달리면 0).
 
-귀신 달리기 애니메이션은 원본 FBX(`assets/Wraith/`)를 **Avatar → Animation Editor → Import from FBX** 로 올려 퍼블리시한 뒤
-그 ID 를 `Config.Assets.WraithRunAnimationId` 에 넣으면 재생됩니다 (리그가 있는 모델을 Assets 에 넣었을 때만).
+### 귀신 리그 + 달리기 애니메이션 (`WraithRig.fbx`)
+
+1. **Home → Import 3D** 로 `assets/import/WraithRig.fbx` 를 엽니다. 미리보기 창에서 리그·메시·텍스처가 보이면 **Rig General → Rig Type: Custom** 으로 두고 Import.
+   (파일 안에 텍스처가 들어 있어 따로 지정할 필요 없습니다. 안 보이면 같은 폴더의 `Wraith.png` 를 MeshPart 의 TextureID 로 넣으세요.)
+2. Workspace 에 `Wraith` 모델(MeshPart `WraithMesh` + Bone 들)이 생깁니다. 임포터 창에 **Animations** 항목이 있으면 켜서 같이 가져오세요.
+   없으면 **Avatar → Animation Editor** 를 열고 그 모델을 선택 → **⋯ → Import → From FBX Animation** → 같은 `WraithRig.fbx` 선택 → 이름 `Run` 으로 **Save**.
+   모델 안에 `AnimSaves/Run`(KeyframeSequence) 이 생깁니다. 코드는 모델 안의 KeyframeSequence 를 자동으로 찾아 재생합니다.
+3. 모델을 **ReplicatedStorage → DeadLake → Assets** 로 옮깁니다. 크기는 코드가 `Config.Assets.WraithHeight` 로 맞추고, 뒤로 달리면 `WraithFacing` 을 0 으로.
+4. 애니메이션을 퍼블리시해서 쓰고 싶으면 그 ID 를 `Config.Assets.WraithRunAnimationId` 에 넣으면 그쪽을 우선 사용합니다.
+
+리그 변환은 `tools/mesh/rig_decimate.py` (Blender 의 bpy 모듈)로 했습니다: 원본 10만 삼각형 → 9,310, 스킨 가중치·UV 유지, 정점당 뼈 4개 제한. 다른 세 모델(나무·양동이·항아리)은 움직이는 부분이 없어 리그가 필요 없습니다.
 
 ## 파일 구조
 
