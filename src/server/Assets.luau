@@ -1,6 +1,6 @@
 -- 외부 메시 에셋 연결 모듈 (Meshy 등에서 가져온 모델).
 -- Studio 에서 Import 3D 로 넣은 모델을 ReplicatedStorage.DeadLake.Assets 아래에 두면 자동으로 사용합니다.
--- 이름은 DeadTree / Wraith / Bucket / Jar 가 포함되기만 하면 됩니다. 없으면 파트로 만든 기본 외형을 씁니다.
+-- 이름은 DeadTree / Wraith / Bucket / Jar / Shrine 가 포함되기만 하면 됩니다. 없으면 파트로 만든 기본 외형을 씁니다.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local KeyframeSequenceProvider = game:GetService("KeyframeSequenceProvider")
@@ -12,6 +12,7 @@ local ALIASES: { [string]: { string } } = {
 	Wraith = { "wraith", "ghost" },
 	Bucket = { "bucket" },
 	Jar = { "jar" },
+	Shrine = { "shrine", "sadang", "사당" },
 }
 
 export type SpawnOpts = {

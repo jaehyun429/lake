@@ -86,11 +86,12 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 | `Wraith.obj` | 귀신 몸 정적 버전 (리그 임포트가 안 될 때 대체) | 18,000 |
 | `Bucket.obj` | 들고 다니는 양동이 + 물가 소품 | 8,000 |
 | `Jar.obj` | 사당 항아리 3개 (물 붓는 곳) | 9,500 |
+| `Shrine.obj` | 동쪽 무너진 사당 건물 (있으면 파트로 지은 사당 대신 사용) | 18,000 |
 
 1. Studio 상단 **Home → Import 3D** 로 `.obj` 를 하나씩 가져옵니다 (텍스처는 같은 폴더의 `.png` 를 자동으로 읽음).
 2. Workspace 에 들어온 모델을 **ReplicatedStorage → DeadLake → Assets** 로 드래그합니다. 이름은 파일명 그대로면 됩니다.
 3. Play 하면 코드가 자동으로 찾아 씁니다. 없는 것은 기존 파트 외형으로 나옵니다.
-   크기·방향은 `Config.Assets` 에서 조정 (`WraithFacing`: 귀신이 뒤로 달리면 0).
+   크기·방향은 `Config.Assets` 에서 조정 (`WraithFacing`: 귀신이 뒤로 달리면 0, `ShrineYaw`: 사당이 호수를 등지면 180).
 
 ### 귀신 리그 + 달리기 애니메이션 (`WraithRig.fbx`)
 

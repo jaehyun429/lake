@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.DeadLake.Shared.Config)
 local Util = require(script.Parent.Util)
+local Assets = require(script.Parent.Assets)
 
 local ShrineBuilder = {}
 
@@ -408,8 +409,59 @@ local function buildCairn(ctx: Ctx)
 	rubble(ctx, 18, 5, 12)
 end
 
----------------------------------------------------------------- 3) 무너진 사당: 기둥·대들보·기와지붕(반쯤 내려앉음)·벽·찢어진 문·제사상
+---------------------------------------------------------------- 3) 무너진 사당
+-- Meshy 사당 메시(Assets 의 "Shrine")가 있으면 그걸 세우고 앞에 초·등·잔해만 놓는다
+local function buildRuinMesh(ctx: Ctx): boolean
+	local A = Config.Assets
+	local mesh = Assets.spawn("Shrine", ctx.Model, { Height = A.ShrineHeight, CanCollide = false, CanQuery = true })
+	if not mesh then
+		return false
+	end
+	local top = ctx.Top
+	-- 모델 앞(-Z)이 호수를 보게. Frame 의 LookVector 가 '뒤'이므로 그 반대를 보도록 yaw 계산
+	local back = ctx.Frame.LookVector
+	local yaw = math.atan2(back.X, back.Z) + math.rad(A.ShrineYaw)
+	Assets.placeOnGround(mesh, L(ctx, 0, top, A.ShrineOffset).Position, yaw)
+	-- 항아리 양옆 초, 왼쪽 앞에 붉은 등, 잔해
+	for _, x in { -2.6, 2.6 } do
+		candle(ctx, L(ctx, x, top + 0.4, -1.2), Vector3.new(0.3, 0.8, 0.3), Color3.fromRGB(205, 195, 165), Color3.fromRGB(255, 180, 110), 9)
+	end
+	local poleCF = L(ctx, -4.5, 0, -2.5)
+	part(ctx, {
+		Name = "LanternPole",
+		Size = Vector3.new(0.25, 5.5, 0.25),
+		CFrame = poleCF * CFrame.new(0, top + 2.75, 0) * CFrame.Angles(0, 0, math.rad(-3)),
+		Color = DARK_WOOD,
+		Material = Enum.Material.Wood,
+	})
+	part(ctx, {
+		Name = "LanternArm",
+		Size = Vector3.new(1.4, 0.15, 0.15),
+		CFrame = poleCF * CFrame.new(0.6, top + 5.3, 0),
+		Color = DARK_WOOD,
+		Material = Enum.Material.Wood,
+		CanCollide = false,
+	})
+	local lantern = part(ctx, {
+		Name = "PaperLantern",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(1.0, 1.0, 1.0),
+		CFrame = poleCF * CFrame.new(1.2, top + 4.5, 0),
+		Color = Color3.fromRGB(130, 36, 30),
+		Material = Enum.Material.Neon,
+		Transparency = 0.45,
+		CanCollide = false,
+		CanQuery = false,
+	})
+	table.insert(ctx.Lights, Util.pointLight(lantern, Color3.fromRGB(255, 90, 70), 11, 0))
+	rubble(ctx, 10, 4, 9)
+	return true
+end
+
 local function buildRuin(ctx: Ctx)
+	if buildRuinMesh(ctx) then
+		return
+	end
 	local rng = ctx.Rng
 	local top = ctx.Top
 	local W, D, H = 11, 9, 6 -- 건물 폭(x), 깊이(z), 기둥 높이

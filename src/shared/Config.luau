@@ -133,7 +133,7 @@ Config.Admin = {
 }
 
 -- 외부 메시 (Meshy 등). Studio 의 Import 3D 로 넣은 모델을 ReplicatedStorage.DeadLake.Assets 에 두면 자동 사용.
--- 이름에 DeadTree / Wraith / Bucket / Jar 가 들어가면 됨. 없으면 파트로 만든 기본 외형을 씀.
+-- 이름에 DeadTree / Wraith / Bucket / Jar / Shrine 가 들어가면 됨. 없으면 파트로 만든 기본 외형을 씀.
 Config.Assets = {
 	TreeHeight = 28, -- 호수 가운데 고목 높이 (스터드)
 	TreeYaw = 0, -- 고목 회전 (도)
@@ -144,6 +144,9 @@ Config.Assets = {
 	WraithRunAnimationId = "", -- 업로드한 달리기 애니메이션 (rbxassetid://...). 비우면 모델 안의 KeyframeSequence 사용
 	BucketHeight = 1.6, -- 들고 다니는 양동이 높이
 	JarHeight = 4.2, -- 제단 항아리 높이
+	ShrineHeight = 14, -- 동쪽 사당 건물(Meshy 메시) 높이. 메시가 없으면 파트로 지음
+	ShrineYaw = 0, -- 사당 메시가 호수를 등지면 180 으로
+	ShrineOffset = 5.5, -- 항아리에서 뒤로 몇 스터드 떨어뜨려 세울지
 }
 
 return Config
