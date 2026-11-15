@@ -187,7 +187,7 @@ end
 
 -- 덫 등 외부 경보
 function GhostSystem.alert(player: Player, pos: Vector3)
-	if sealed or not ctx.isPlaying() then
+	if sealed or not ctx.isPlaying() or PlayerState.isAdmin(player) then
 		return
 	end
 	getState(player).Awareness = 1
@@ -429,7 +429,7 @@ function GhostSystem.update(dt: number)
 			end
 			continue
 		end
-		if not root or not hum or status ~= "Alive" or not playing or sealed then
+		if not root or not hum or status ~= "Alive" or not playing or sealed or PlayerState.isAdmin(player) then
 			s.Awareness = 0
 			player:SetAttribute("Awareness", 0)
 			player:SetAttribute("Threat", 0)
@@ -496,7 +496,7 @@ function GhostSystem.update(dt: number)
 	elseif gState == "Hunting" then
 		local target = gTarget
 		local troot = target and PlayerState.getRoot(target)
-		if not target or not troot or PlayerState.getStatus(target) ~= "Alive" then
+		if not target or not troot or PlayerState.getStatus(target) ~= "Alive" or PlayerState.isAdmin(target) then
 			startSearch(gLastKnown or gPos)
 		else
 			local s = getState(target)

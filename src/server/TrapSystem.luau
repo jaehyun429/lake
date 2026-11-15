@@ -200,6 +200,7 @@ function TrapSystem.spawn(count: number)
 				if
 					player
 					and PlayerState.isAlive(player)
+					and not PlayerState.isAdmin(player)
 					and (
 						hit.Name == "LeftFoot"
 						or hit.Name == "RightFoot"

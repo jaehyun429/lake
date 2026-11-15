@@ -41,7 +41,7 @@ function StaminaSystem.update(dt: number)
 			continue
 		end
 		local moving = root ~= nil and (root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude > 1.5
-		if player:GetAttribute("Sprinting") == true and moving then
+		if player:GetAttribute("Sprinting") == true and moving and not PlayerState.isAdmin(player) then
 			s -= dt / P.SprintStaminaTime
 			if s <= 0 then
 				s = 0

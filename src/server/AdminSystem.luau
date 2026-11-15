@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.DeadLake.Shared.Config)
 local Net = require(script.Parent.Net)
+local PlayerState = require(script.Parent.PlayerState)
 
 local AdminSystem = {}
 
@@ -38,7 +39,17 @@ function AdminSystem.init()
 		end
 		local on = player:GetAttribute("Admin") ~= true
 		player:SetAttribute("Admin", on)
-		Net.notify(player, if on then "관리자 모드 켜짐: 화면이 밝아집니다 (P 로 끄기)" else "관리자 모드 꺼짐", 2.5)
+		PlayerState.applySpeed(player)
+		Net.notify(
+			player,
+			if on
+				then string.format(
+					"관리자 모드 켜짐: 밝은 화면, 귀신 무시, 덫 표시·면역, 속도 %d배, 스태미나 무한 (P 로 끄기)",
+					Config.Admin.SpeedMult
+				)
+				else "관리자 모드 꺼짐",
+			3
+		)
 	end)
 end
 

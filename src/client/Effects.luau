@@ -168,10 +168,69 @@ function Effects.setLantern(on: boolean)
 	lanternOn = on
 end
 
+-- 관리자 모드: 덫에 빨간 Highlight (클라이언트에서만 만들어 나에게만 보임)
+local trapHighlightConn: RBXScriptConnection? = nil
+local trapHighlights: { Highlight } = {}
+local function highlightTrap(trap: Instance)
+	if not trap:IsA("Model") then
+		return
+	end
+	local h = Instance.new("Highlight")
+	h.Name = "AdminTrapHighlight"
+	h.FillColor = Color3.fromRGB(255, 60, 40)
+	h.FillTransparency = 0.5
+	h.OutlineColor = Color3.fromRGB(255, 120, 90)
+	h.OutlineTransparency = 0
+	h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	h.Adornee = trap
+	h.Parent = trap
+	table.insert(trapHighlights, h)
+end
+local function setTrapHighlights(on: boolean)
+	if trapHighlightConn then
+		trapHighlightConn:Disconnect()
+		trapHighlightConn = nil
+	end
+	for _, h in trapHighlights do
+		h:Destroy()
+	end
+	table.clear(trapHighlights)
+	if not on then
+		return
+	end
+	task.spawn(function()
+		local map = workspace:WaitForChild("DeadLake", 30)
+		if not map then
+			return
+		end
+		local traps = map:FindFirstChild("Traps") or map:WaitForChild("Traps", 30)
+		if not traps or not adminBright then
+			return
+		end
+		for _, t in traps:GetChildren() do
+			highlightTrap(t)
+		end
+		trapHighlightConn = traps.ChildAdded:Connect(highlightTrap)
+		-- 라운드가 새로 시작되면 Traps 폴더가 다시 만들어짐
+		map.ChildAdded:Connect(function(child)
+			if child.Name == "Traps" and adminBright then
+				if trapHighlightConn then
+					trapHighlightConn:Disconnect()
+				end
+				trapHighlightConn = child.ChildAdded:Connect(highlightTrap)
+				for _, t in child:GetChildren() do
+					highlightTrap(t)
+				end
+			end
+		end)
+	end)
+end
+
 -- 관리자 모드: 내 화면의 Lighting 만 대낮처럼. 끌 때 원래 값으로 복원 (서버 값은 건드리지 않음)
 local savedLighting: { [string]: any }? = nil
 function Effects.setAdminBright(on: boolean)
 	adminBright = on
+	setTrapHighlights(on)
 	local atmo = Lighting:FindFirstChildOfClass("Atmosphere")
 	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	if on then

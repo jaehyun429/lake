@@ -197,9 +197,9 @@ function HUD.init()
 
 	-- 관리자 모드 표시 (우측 상단)
 	adminLabel = label(gui, {
-		Size = UDim2.fromOffset(260, 24),
-		Position = UDim2.new(1, -280, 0, 18),
-		Text = "관리자 모드: 밝게  [P]",
+		Size = UDim2.fromOffset(420, 24),
+		Position = UDim2.new(1, -440, 0, 18),
+		Text = "관리자 모드  [P]  밝음 · 귀신 무시 · 덫 표시 · 2배속",
 		TextSize = 16,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextColor3 = Color3.fromRGB(255, 220, 120),

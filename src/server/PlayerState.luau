@@ -30,6 +30,11 @@ function PlayerState.getRoot(player: Player): (BasePart?, Humanoid?)
 	return nil, nil
 end
 
+-- 관리자(테스트) 모드가 켜져 있는가. 귀신이 무시하고, 덫에 안 걸리고, 빠르고, 스태미나가 안 닳음
+function PlayerState.isAdmin(player: Player): boolean
+	return player:GetAttribute("Admin") == true
+end
+
 -- 달리기/양동이 상태를 반영해 이동 속도 적용
 function PlayerState.applySpeed(player: Player)
 	local _, hum = PlayerState.getRoot(player)
@@ -40,6 +45,9 @@ function PlayerState.applySpeed(player: Player)
 	local speed = if player:GetAttribute("Sprinting") == true then P.SprintSpeed else P.WalkSpeed
 	if player:GetAttribute("Carrying") == true then
 		speed *= P.CarrySpeedMult
+	end
+	if PlayerState.isAdmin(player) then
+		speed *= Config.Admin.SpeedMult
 	end
 	hum.WalkSpeed = speed
 end

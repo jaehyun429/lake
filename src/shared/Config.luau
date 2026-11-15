@@ -128,6 +128,8 @@ Config.Sounds = {
 Config.Admin = {
 	Users = { "jaehyun429" }, -- 추가로 허용할 로블록스 사용자 이름(또는 표시 이름)
 	GroupRank = 254, -- 그룹 소유 플레이스일 때 이 등급 이상이면 허용
+	SpeedMult = 2, -- 켜면 이동 속도 배율
+	-- 켜면: 귀신이 무시(발각 안 됨, 쫓던 중이면 놓침), 덫에 안 걸림, 덫이 빨갛게 표시, 스태미나 안 닳음, 화면 밝음
 }
 
 -- 외부 메시 (Meshy 등). Studio 의 Import 3D 로 넣은 모델을 ReplicatedStorage.DeadLake.Assets 에 두면 자동 사용.
