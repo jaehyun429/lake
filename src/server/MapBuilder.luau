@@ -241,8 +241,8 @@ local function buildPath(folder: Instance, from: Vector3, to: Vector3, record: b
 	local len = (b - a).Magnitude
 	local p = Util.part({
 		Name = "Path",
-		Size = Vector3.new(7, 0.3, len),
-		CFrame = CFrame.lookAt((a + b) / 2 + Vector3.new(0, 0.1, 0), b + Vector3.new(0, 0.1, 0)),
+		Size = Vector3.new(7, 0.2, len),
+		CFrame = CFrame.lookAt((a + b) / 2 + Vector3.new(0, 0.02, 0), b + Vector3.new(0, 0.02, 0)),
 		Color = COL.Dirt,
 		Material = Enum.Material.Ground,
 		CanCollide = false,
@@ -351,10 +351,11 @@ local function buildCamp(folder: Folder, info: MapInfo)
 		local a = i / 24 * math.pi * 2
 		Util.part({
 			Name = "SafeStone",
-			Size = Vector3.new(1.6, 0.5, 0.9),
-			CFrame = CFrame.new(c + Vector3.new(math.cos(a) * M.SafeRadius, 0.2, math.sin(a) * M.SafeRadius)) * CFrame.Angles(0, -a, 0),
+			Size = Vector3.new(1.6, 0.3, 0.9),
+			CFrame = CFrame.new(c + Vector3.new(math.cos(a) * M.SafeRadius, 0.08, math.sin(a) * M.SafeRadius)) * CFrame.Angles(0, -a, 0),
 			Color = Color3.fromRGB(70, 70, 72),
 			Material = Enum.Material.Slate,
+			CanCollide = false,
 			Parent = camp,
 		})
 	end
@@ -367,21 +368,24 @@ local function buildAltar(folder: Folder, info: MapInfo)
 	altar.Name = "Altar"
 	altar.Parent = folder
 
-	-- 돌 단 2층
+	-- 돌바닥 (단차 없이 땅과 거의 같은 높이. 안쪽은 색만 다름)
+	local top = 0.25 -- 바닥 윗면 높이
 	Util.part({
 		Name = "Base1",
-		Size = Vector3.new(22, 1.2, 22),
-		Position = c + Vector3.new(0, 0.6, 0),
+		Size = Vector3.new(22, 0.25, 22),
+		Position = c + Vector3.new(0, top - 0.125, 0),
 		Color = Color3.fromRGB(48, 48, 52),
 		Material = Enum.Material.Slate,
+		CanCollide = false,
 		Parent = altar,
 	})
 	Util.part({
 		Name = "Base2",
-		Size = Vector3.new(14, 1.2, 14),
-		Position = c + Vector3.new(0, 1.8, 0),
+		Size = Vector3.new(14, 0.25, 14),
+		Position = c + Vector3.new(0, top - 0.105, 0),
 		Color = Color3.fromRGB(42, 42, 46),
 		Material = Enum.Material.Slate,
+		CanCollide = false,
 		Parent = altar,
 	})
 	-- 물그릇: Jar 메시가 있으면 항아리, 없으면 돌 수반
@@ -391,24 +395,24 @@ local function buildAltar(folder: Folder, info: MapInfo)
 	local waterDiameter: number
 	local jar = Assets.spawn("Jar", altar, { Height = Config.Assets.JarHeight, CanCollide = false })
 	if jar then
-		Assets.placeOnGround(jar, c + Vector3.new(0, 2.4, 0))
+		Assets.placeOnGround(jar, c + Vector3.new(0, top, 0))
 		local _, size = jar:GetBoundingBox()
 		vessel = jar.PrimaryPart :: BasePart
-		waterMinY = c.Y + 2.4 + size.Y * 0.3
-		waterMaxY = c.Y + 2.4 + size.Y + 0.05
+		waterMinY = c.Y + top + size.Y * 0.3
+		waterMaxY = c.Y + top + size.Y + 0.05
 		waterDiameter = math.max(1, math.min(size.X, size.Z) * 0.5)
 	else
 		vessel = Util.part({
 			Name = "Basin",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(3, 7, 7),
-			CFrame = CFrame.new(c + Vector3.new(0, 3.9, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			CFrame = CFrame.new(c + Vector3.new(0, top + 1.5, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 			Color = Color3.fromRGB(30, 30, 34),
 			Material = Enum.Material.Slate,
 			Parent = altar,
 		})
-		waterMinY = c.Y + 2.6
-		waterMaxY = c.Y + 4.8
+		waterMinY = c.Y + top + 0.2
+		waterMaxY = c.Y + top + 2.4
 		waterDiameter = 6
 	end
 	local water = Util.part({
@@ -427,7 +431,7 @@ local function buildAltar(folder: Folder, info: MapInfo)
 	Util.part({
 		Name = "Stele",
 		Size = Vector3.new(4, 7, 1),
-		Position = c + Vector3.new(0, 5.9, 4.5),
+		Position = c + Vector3.new(0, top + 3.5, 4.5),
 		Color = Color3.fromRGB(36, 36, 40),
 		Material = Enum.Material.Slate,
 		Parent = altar,
@@ -447,7 +451,7 @@ local function buildAltar(folder: Folder, info: MapInfo)
 		local candle = Util.part({
 			Name = "Candle",
 			Size = Vector3.new(0.4, 0.8, 0.4),
-			Position = c + Vector3.new(math.cos(a) * 6, 2.8, math.sin(a) * 6),
+			Position = c + Vector3.new(math.cos(a) * 6, top + 0.4, math.sin(a) * 6),
 			Color = Color3.fromRGB(200, 190, 160),
 			Material = Enum.Material.SmoothPlastic,
 			CanCollide = false,
@@ -600,7 +604,7 @@ local function buildStations(folder: Folder, info: MapInfo)
 			Util.part({
 				Name = "Deck",
 				Size = Vector3.new(6, 0.6, (endP - startP).Magnitude),
-				CFrame = CFrame.lookAt((startP + endP) / 2 + Vector3.new(0, 0, 0), endP),
+				CFrame = CFrame.lookAt((startP + endP) / 2 - Vector3.new(0, 0.15, 0), endP - Vector3.new(0, 0.15, 0)),
 				Color = COL.OldWood,
 				Material = Enum.Material.WoodPlanks,
 				Parent = m,
