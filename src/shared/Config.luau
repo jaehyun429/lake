@@ -96,10 +96,11 @@ Config.Map = {
 	SafeRadius = 28,
 	GatePosition = Vector3.new(0, 0, 195),
 	-- 채워야 하는 항아리(사당) 3곳. 호수 주변에 흩어져 있고 길로 이어짐. 전부 채우면 봉인.
+	-- Kind: Altar(돌 제단상·비석·금줄 기둥·석등) / Cairn(돌탑 여러 개·천 장대) / Ruin(기와지붕 반쯤 내려앉은 사당)
 	Shrines = {
-		{ Name = "건너편 제단", Position = Vector3.new(0, 0, -168), Pillars = 8 },
-		{ Name = "서쪽 돌탑", Position = Vector3.new(-160, 0, -40), Pillars = 4 },
-		{ Name = "동쪽 무너진 사당", Position = Vector3.new(160, 0, 10), Pillars = 5 },
+		{ Name = "건너편 제단", Position = Vector3.new(0, 0, -168), Kind = "Altar" },
+		{ Name = "서쪽 돌탑", Position = Vector3.new(-160, 0, -40), Kind = "Cairn" },
+		{ Name = "동쪽 무너진 사당", Position = Vector3.new(160, 0, 10), Kind = "Ruin" },
 	},
 	-- 물을 뜰 수 있는 지점 3곳. FillMult: 긷는 속도 (선착장은 귀신 코앞이라 빠름)
 	Stations = {

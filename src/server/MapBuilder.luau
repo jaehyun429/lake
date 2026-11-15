@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.DeadLake.Shared.Config)
 local Util = require(script.Parent.Util)
 local Assets = require(script.Parent.Assets)
+local ShrineBuilder = require(script.Parent.ShrineBuilder)
 
 local M = Config.Map
 local MapBuilder = {}
@@ -375,26 +376,50 @@ local function buildShrine(folder: Folder, index: number, def: any): Shrine
 	altar.Name = "Shrine" .. index
 	altar.Parent = folder
 
-	-- 돌바닥 (단차 없이 땅과 거의 같은 높이. 안쪽은 색만 다름)
+	-- 바닥 (단차 없이 땅과 거의 같은 높이). 종류별로 다름
 	local top = 0.25 -- 바닥 윗면 높이
-	Util.part({
-		Name = "Base1",
-		Size = Vector3.new(22, 0.25, 22),
-		Position = c + Vector3.new(0, top - 0.125, 0),
-		Color = Color3.fromRGB(48, 48, 52),
-		Material = Enum.Material.Slate,
-		CanCollide = false,
-		Parent = altar,
-	})
-	Util.part({
-		Name = "Base2",
-		Size = Vector3.new(14, 0.25, 14),
-		Position = c + Vector3.new(0, top - 0.105, 0),
-		Color = Color3.fromRGB(42, 42, 46),
-		Material = Enum.Material.Slate,
-		CanCollide = false,
-		Parent = altar,
-	})
+	local kind = (def.Kind :: string?) or "Altar"
+	if kind == "Cairn" then
+		Util.part({
+			Name = "Gravel",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.25, 26, 26),
+			CFrame = CFrame.new(c + Vector3.new(0, top - 0.125, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(62, 60, 58),
+			Material = Enum.Material.Pebble,
+			CanCollide = false,
+			Parent = altar,
+		})
+	elseif kind == "Ruin" then
+		Util.part({
+			Name = "StoneFloor",
+			Size = Vector3.new(16, 0.25, 15),
+			Position = c + Vector3.new(0, top - 0.125, 0),
+			Color = Color3.fromRGB(50, 48, 50),
+			Material = Enum.Material.Cobblestone,
+			CanCollide = false,
+			Parent = altar,
+		})
+	else
+		Util.part({
+			Name = "Base1",
+			Size = Vector3.new(22, 0.25, 22),
+			Position = c + Vector3.new(0, top - 0.125, 0),
+			Color = Color3.fromRGB(48, 48, 52),
+			Material = Enum.Material.Slate,
+			CanCollide = false,
+			Parent = altar,
+		})
+		Util.part({
+			Name = "Base2",
+			Size = Vector3.new(14, 0.25, 14),
+			Position = c + Vector3.new(0, top - 0.105, 0),
+			Color = Color3.fromRGB(42, 42, 46),
+			Material = Enum.Material.Slate,
+			CanCollide = false,
+			Parent = altar,
+		})
+	end
 	-- 물그릇: Jar 메시가 있으면 항아리, 없으면 돌 수반
 	local vessel: BasePart
 	local waterMinY: number
@@ -434,43 +459,24 @@ local function buildShrine(folder: Folder, index: number, def: any): Shrine
 		CanCollide = false,
 		Parent = altar,
 	})
-	-- 비석 + 돌기둥 원
-	Util.part({
-		Name = "Stele",
-		Size = Vector3.new(4, 7, 1),
-		Position = c + Vector3.new(0, top + 3.5, 4.5),
-		Color = Color3.fromRGB(36, 36, 40),
-		Material = Enum.Material.Slate,
-		Parent = altar,
-	})
-	local candles = {}
-	local pillars = (def.Pillars :: number?) or 6
-	for i = 1, 8 do
-		local a = i / 8 * math.pi * 2
-		local pos = c + Vector3.new(math.cos(a) * 16, 0, math.sin(a) * 16)
-		if i <= pillars then
-			local ph = rng:NextNumber(5, 9)
-			Util.part({
-				Name = "Pillar",
-				Size = Vector3.new(2, ph, 2),
-				CFrame = CFrame.new(pos + Vector3.new(0, ph / 2 - 0.5, 0)) * CFrame.Angles(math.rad(rng:NextNumber(-3, 3)), 0, math.rad(rng:NextNumber(-3, 3))),
-				Color = Color3.fromRGB(40, 40, 44),
-				Material = Enum.Material.Slate,
-				Parent = altar,
-			})
+	-- 종류별 장식 (제단상·돌탑·무너진 사당). 길이 들어오는 방향(물가·다른 사당 쪽)엔 장애물을 안 세움
+	local approach: { Vector3 } = {}
+	for _, st in M.Stations do
+		local shore = M.LakeCenter + (st.Direction :: Vector3).Unit * (M.LakeRadius + M.BeachWidth + 1)
+		local d = flat(shore - c)
+		if d.Magnitude > 1 then
+			table.insert(approach, d.Unit)
 		end
-		local candle = Util.part({
-			Name = "Candle",
-			Size = Vector3.new(0.4, 0.8, 0.4),
-			Position = c + Vector3.new(math.cos(a) * 6, top + 0.4, math.sin(a) * 6),
-			Color = Color3.fromRGB(200, 190, 160),
-			Material = Enum.Material.SmoothPlastic,
-			CanCollide = false,
-			Parent = altar,
-		})
-		local light = Util.pointLight(candle, Color3.fromRGB(120, 170, 255), 6, 0.0)
-		table.insert(candles, light)
 	end
+	for j, other in M.Shrines do
+		if j ~= index then
+			local d = flat(other.Position - c)
+			if d.Magnitude > 1 then
+				table.insert(approach, d.Unit)
+			end
+		end
+	end
+	local candles = ShrineBuilder.decorate(kind, altar, c, top, approach, 7000 + index)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "물 붓기"
 	prompt.ObjectText = def.Name

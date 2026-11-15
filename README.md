@@ -43,7 +43,7 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 0. 라운드·대기 없음. 들어오면 바로 캠프에서 시작하고, 진행 중에 들어온 사람도 바로 캠프에 합류한다. 끝나면 결과 화면 8초 뒤 맵을 되돌리고 전원 캠프에서 다시 시작.
 1. 캠프(안전지대)에서 출발. 랜턴은 꺼진 상태.
 2. 호수 물가 3곳 중 하나에서 E 로 6초간 물을 긷는다. 귀신은 호수 가운데 버드나무 옆에 잠겨 있다 → **물가에서는 랜턴을 꺼야** 발각 게이지가 안 찬다.
-3. 양동이를 들고(속도 70%) 호수 주변 **사당 3곳**(건너편 제단 / 서쪽 돌탑 / 동쪽 무너진 사당) 중 비어 있는 항아리로 길을 따라간다. 길 위에는 매 판 랜덤한 위치에 **덫**이 있다. 어두워서 랜턴 없이는 안 보인다.
+3. 양동이를 들고(속도 70%) 호수 주변 **사당 3곳**(건너편 제단: 돌 제단상·비석·금줄 두른 돌기둥·석등 / 서쪽 돌탑: 돌탑 무리와 색 바랜 천 장대 / 동쪽 무너진 사당: 기와지붕이 반쯤 내려앉은 사당) 중 비어 있는 항아리로 길을 따라간다. 길 위에는 매 판 랜덤한 위치에 **덫**이 있다. 어두워서 랜턴 없이는 안 보인다.
 4. 덫을 밟으면 3초간 발이 묶이고 쇳소리에 귀신이 그 자리로 달려온다(속도 16.5 = 걷기보다 빠르고 달리기보다 느림). 양동이를 들고는 못 도망치므로 **G 로 버리고** 달리거나, 랜턴을 끄고 숨는다.
 5. 귀신은 랜턴 불빛(120스터드), 12스터드 안의 기척, 32스터드 안의 달리기 소음, 물에 들어간 플레이어를 감지한다. 놓치면 마지막 목격 지점을 6초 뒤지고 호수로 돌아간다. 캠프 안전지대 안으로는 못 들어온다.
 6. 붙잡히면 4초 안에 E 10회 연타 또는 팀원 구조(1.5초 홀드). 실패하면 호수로 끌려가 탈락(관전).
@@ -110,6 +110,7 @@ default.project.json         Rojo 트리 (Remotes, GameState, Lighting 설정 �
 src/shared/Config.luau       모든 밸런스 숫자
 src/server/Main.server.luau  서버 진입점
 src/server/MapBuilder.luau   지형·호수·버드나무·캠프·사당 3곳·물가·출구·숲 생성
+src/server/ShrineBuilder.luau 사당 외형 3종(제단/돌탑/무너진 사당)을 파트로 생성. 종류는 Config.Map.Shrines[].Kind
 src/server/GhostBuilder.luau 귀신 본체 / 파문 / 물보라
 src/server/RoundManager.luau 진행 상태(시작/봉인/탈출/종료), 스폰·합류, 항아리 채움, 승패 판정, 출구 문
 src/server/WaterSystem.luau  물 긷기 게이지, 양동이 운반/버리기, 항아리에 붓기
@@ -122,6 +123,8 @@ src/client/HUD.luau          타이머·양동이·배너·게이지·연타·�
 src/client/Effects.luau      비네트·심장박동·흔들림
 src/client/Spectate.luau     관전 카메라
 tools/check.sh               luau-analyze + stylua + rojo build
+tools/preview/               Studio 없이 파트 모델을 luau+Blender 로 렌더해 보는 도구
+tools/mesh/                  Meshy FBX → 로블록스용 OBJ/FBX 변환 (삼각형 감소, 리그 유지)
 ```
 
 상태는 Attribute 로 복제됩니다: `ReplicatedStorage.DeadLake.GameState` (Phase, TimeLeft, Buckets, Target, Result, Reason), `Player` (Status, Carrying, Fill, Filling, Awareness, Threat, Sprinting, LanternOn).
