@@ -108,7 +108,7 @@ function Effects.init()
 	beam.Brightness = 0
 	beam.Shadows = true
 	beam.Parent = beamPart
-	beamPart.Parent = camera
+	beamPart.Parent = workspace -- 클라이언트가 만든 파트는 서버로 복제되지 않음
 
 	-- 내 머리에 붙은(다른 사람용) 빛은 내 화면에서는 끈다. 카메라 빛과 겹치면 두 배로 밝아짐
 	local function hideOwnHeadBeam(char: Model)

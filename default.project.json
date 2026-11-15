@@ -60,14 +60,14 @@
         "ClockTime": 0,
         "Brightness": 0.75,
         "Ambient": [
-          0.035,
-          0.04,
-          0.055
+          0.1,
+          0.11,
+          0.15
         ],
         "OutdoorAmbient": [
-          0.1,
-          0.115,
-          0.15
+          0.26,
+          0.29,
+          0.38
         ],
         "ColorShift_Top": [
           0.55,
@@ -75,43 +75,43 @@
           0.8
         ],
         "FogColor": [
-          0.03,
-          0.035,
-          0.045
+          0.08,
+          0.09,
+          0.12
         ],
         "FogStart": 6,
-        "FogEnd": 140,
+        "FogEnd": 220,
         "GlobalShadows": true,
-        "EnvironmentDiffuseScale": 0.15,
+        "EnvironmentDiffuseScale": 0.35,
         "EnvironmentSpecularScale": 0.15,
-        "ExposureCompensation": -0.05,
+        "ExposureCompensation": 0.35,
         "ShadowSoftness": 0.3
       },
       "Atmosphere": {
         "$className": "Atmosphere",
         "$properties": {
-          "Density": 0.5,
-          "Offset": 0.1,
+          "Density": 0.3,
+          "Offset": 0.15,
           "Color": [
-            0.3,
-            0.33,
-            0.4
+            0.42,
+            0.46,
+            0.58
           ],
           "Decay": [
-            0.1,
-            0.11,
-            0.15
+            0.2,
+            0.22,
+            0.3
           ],
           "Glare": 0,
-          "Haze": 3.5
+          "Haze": 1.8
         }
       },
       "ColorCorrection": {
         "$className": "ColorCorrectionEffect",
         "$properties": {
-          "Saturation": -0.35,
-          "Contrast": 0.12,
-          "Brightness": -0.02,
+          "Saturation": -0.3,
+          "Contrast": 0.08,
+          "Brightness": 0.03,
           "TintColor": [
             0.82,
             0.88,

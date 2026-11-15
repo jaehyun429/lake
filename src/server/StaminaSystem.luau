@@ -31,13 +31,15 @@ function StaminaSystem.update(dt: number)
 	local P = Config.Player
 	for _, player in Players:GetPlayers() do
 		local s = stamina[player] or 1
-		if not PlayerState.isAlive(player) then
+		local status = PlayerState.getStatus(player)
+		local root = PlayerState.getRoot(player)
+		-- 로비·대기 중에도 달릴 수 있으니 캐릭터가 있으면 깎인다. 죽음/탈출/붙잡힘만 제외
+		if root == nil or status == "Dead" or status == "Escaped" or status == "Grabbed" then
 			if s ~= 1 then
 				StaminaSystem.reset(player)
 			end
 			continue
 		end
-		local root = PlayerState.getRoot(player)
 		local moving = root ~= nil and (root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude > 1.5
 		if player:GetAttribute("Sprinting") == true and moving then
 			s -= dt / P.SprintStaminaTime
