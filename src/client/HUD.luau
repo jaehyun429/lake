@@ -50,6 +50,7 @@ local resultTitle: TextLabel
 local resultReason: TextLabel
 local spectateLabel: TextLabel
 local helpLabel: TextLabel
+local adminLabel: TextLabel
 local lanternLabel: TextLabel
 local awareFrame: Frame
 local awareFill: Frame
@@ -194,6 +195,18 @@ function HUD.init()
 	resultTitle = label(resultFrame, { Size = UDim2.new(1, 0, 0, 80), Position = UDim2.new(0, 0, 0.36, 0), Text = "", TextSize = 56, Font = FONT_BOLD })
 	resultReason = label(resultFrame, { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0.36, 90), Text = "", TextSize = 22 })
 
+	-- 관리자 모드 표시 (우측 상단)
+	adminLabel = label(gui, {
+		Size = UDim2.fromOffset(260, 24),
+		Position = UDim2.new(1, -280, 0, 18),
+		Text = "관리자 모드: 밝게  [P]",
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Color3.fromRGB(255, 220, 120),
+		Font = FONT_BOLD,
+		Visible = false,
+	})
+
 	-- 관전 / 도움말
 	spectateLabel =
 		label(gui, { Size = UDim2.new(1, 0, 0, 30), Position = UDim2.new(0, 0, 1, -80), Text = "", TextSize = 18, TextColor3 = Color3.fromRGB(200, 200, 190) })
@@ -314,6 +327,10 @@ function HUD.setStamina(value: number)
 			end
 		end)
 	end
+end
+
+function HUD.setAdmin(on: boolean)
+	adminLabel.Visible = on
 end
 
 function HUD.setLantern(on: boolean)

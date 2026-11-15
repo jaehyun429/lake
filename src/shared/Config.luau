@@ -124,6 +124,12 @@ Config.Sounds = {
 	Footstep = "rbxasset://sounds/action_footsteps_plastic.mp3",
 }
 
+-- 관리자(테스트) 모드: P 키. 켠 사람 화면만 대낮처럼 밝아짐. Studio 안과 플레이스 소유자는 항상 허용.
+Config.Admin = {
+	Users = { "jaehyun429" }, -- 추가로 허용할 로블록스 사용자 이름(또는 표시 이름)
+	GroupRank = 254, -- 그룹 소유 플레이스일 때 이 등급 이상이면 허용
+}
+
 -- 외부 메시 (Meshy 등). Studio 의 Import 3D 로 넣은 모델을 ReplicatedStorage.DeadLake.Assets 에 두면 자동 사용.
 -- 이름에 DeadTree / Wraith / Bucket / Jar 가 들어가면 됨. 없으면 파트로 만든 기본 외형을 씀.
 Config.Assets = {

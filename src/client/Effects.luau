@@ -1,6 +1,7 @@
 -- 위험 연출: 화면 가장자리 어두워짐, 심장박동, 경고 플래시, 끌려갈 때 화면 흔들림
 -- + 랜턴 빛: 카메라를 따라가는 원뿔 빛(앞쪽 동그라미만 밝음)과 가장자리 비네트
 local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
@@ -22,6 +23,7 @@ local heartbeat2: Sound
 local shakeUntil = 0
 local shakeStrength = 0
 local lanternOn = false
+local adminBright = false -- 관리자 모드: 비네트 끔
 local lanternAlpha = 0 -- 0~1, 켜고 끌 때 부드럽게
 local beamPart: BasePart
 local beam: SpotLight
@@ -144,6 +146,9 @@ function Effects.init()
 		local alpha = math.clamp((level - 0.2) / 0.8, 0, 1)
 		local pulse = if level > 0.6 then (math.sin(os.clock() * 6) * 0.5 + 0.5) * 0.15 else 0
 		local dark = math.min(1, alpha * 0.75 + pulse + L.ScreenVignette * lanternAlpha)
+		if adminBright then
+			dark = 0
+		end
 		for _, f in vignette do
 			f.BackgroundTransparency = 1 - dark
 		end
@@ -161,6 +166,58 @@ end
 
 function Effects.setLantern(on: boolean)
 	lanternOn = on
+end
+
+-- 관리자 모드: 내 화면의 Lighting 만 대낮처럼. 끌 때 원래 값으로 복원 (서버 값은 건드리지 않음)
+local savedLighting: { [string]: any }? = nil
+function Effects.setAdminBright(on: boolean)
+	adminBright = on
+	local atmo = Lighting:FindFirstChildOfClass("Atmosphere")
+	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+	if on then
+		if not savedLighting then
+			savedLighting = {
+				Brightness = Lighting.Brightness,
+				Ambient = Lighting.Ambient,
+				OutdoorAmbient = Lighting.OutdoorAmbient,
+				ClockTime = Lighting.ClockTime,
+				FogStart = Lighting.FogStart,
+				FogEnd = Lighting.FogEnd,
+				ExposureCompensation = Lighting.ExposureCompensation,
+				AtmoDensity = if atmo then atmo.Density else nil,
+				CcEnabled = if cc then cc.Enabled else nil,
+			}
+		end
+		Lighting.Brightness = 2.5
+		Lighting.Ambient = Color3.fromRGB(170, 170, 175)
+		Lighting.OutdoorAmbient = Color3.fromRGB(190, 190, 200)
+		Lighting.ClockTime = 14
+		Lighting.FogStart = 100000
+		Lighting.FogEnd = 200000
+		Lighting.ExposureCompensation = 0.4
+		if atmo then
+			atmo.Density = 0
+		end
+		if cc then
+			cc.Enabled = false
+		end
+	elseif savedLighting then
+		local s = savedLighting
+		Lighting.Brightness = s.Brightness
+		Lighting.Ambient = s.Ambient
+		Lighting.OutdoorAmbient = s.OutdoorAmbient
+		Lighting.ClockTime = s.ClockTime
+		Lighting.FogStart = s.FogStart
+		Lighting.FogEnd = s.FogEnd
+		Lighting.ExposureCompensation = s.ExposureCompensation
+		if atmo and s.AtmoDensity ~= nil then
+			atmo.Density = s.AtmoDensity
+		end
+		if cc and s.CcEnabled ~= nil then
+			cc.Enabled = s.CcEnabled
+		end
+		savedLighting = nil
+	end
 end
 
 function Effects.setWarning(on: boolean)

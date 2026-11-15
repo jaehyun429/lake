@@ -83,6 +83,11 @@ player:GetAttributeChangedSignal("Carrying"):Connect(function()
 end)
 HUD.setLantern(player:GetAttribute("LanternOn") == true)
 Effects.setLantern(player:GetAttribute("LanternOn") == true)
+player:GetAttributeChangedSignal("Admin"):Connect(function()
+	local on = player:GetAttribute("Admin") == true
+	Effects.setAdminBright(on)
+	HUD.setAdmin(on)
+end)
 
 ---------------------------------------------------------------- 서버 메시지
 local function playUi(id: string, volume: number, pitch: number)
@@ -162,6 +167,14 @@ ContextActionService:BindAction("DeadLakeSprint", function(_, state)
 end, true, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift, Enum.KeyCode.ButtonL3)
 ContextActionService:SetTitle("DeadLakeSprint", "달리기")
 ContextActionService:SetPosition("DeadLakeSprint", UDim2.new(0.72, 0, 0.35, 0))
+
+-- 관리자(테스트) 모드: P. 서버가 허용된 사람인지 확인한 뒤 Admin 속성을 바꿈
+ContextActionService:BindAction("DeadLakeAdmin", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		send("Admin")
+	end
+	return Enum.ContextActionResult.Pass
+end, false, Enum.KeyCode.P)
 
 ContextActionService:BindAction("DeadLakeLantern", function(_, state)
 	if state == Enum.UserInputState.Begin then

@@ -35,6 +35,7 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 | E 연타 (붙잡혔을 때) | 뿌리치기 |
 | E 길게 (잡힌 팀원 옆) | 구조하기 |
 | ← → (관전 중) | 관전 대상 전환 |
+| P (관리자) | 테스트용 관리자 모드: 내 화면만 대낮처럼 밝게. Studio 안·플레이스 소유자·`Config.Admin.Users` 만 가능 |
 
 모바일은 랜턴/버리기/달리기/뿌리치기 버튼이 자동으로 생깁니다. 카메라는 1인칭 고정입니다.
 
@@ -117,6 +118,7 @@ src/server/WaterSystem.luau  물 긷기 게이지, 양동이 운반/버리기, �
 src/server/GhostSystem.luau  발각 게이지, 사냥꾼 AI(추격/수색/복귀/경직/봉인), 붙잡기, 탈출/구조, 끌려감
 src/server/TrapSystem.luau   덫 랜덤 배치, 밟기 감지, 귀신 호출, 재장전
 src/server/LanternSystem.luau 랜턴 Tool 지급, 켜기/끄기
+src/server/AdminSystem.luau  관리자(테스트) 모드 허용 판정 (P 키 → Admin 속성)
 src/server/Net.luau          RemoteEvent 래퍼 / PlayerState.luau 상태 헬퍼 / Util.luau 파트 유틸
 src/client/Main.client.luau  입력(달리기·연타), 서버 메시지 처리
 src/client/HUD.luau          타이머·양동이·배너·게이지·연타·결과 UI
