@@ -2,7 +2,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
-local SoundService = game:GetService("SoundService")
 
 local root = ReplicatedStorage:WaitForChild("DeadLake")
 local Config = require(root:WaitForChild("Shared"):WaitForChild("Config"))
@@ -14,6 +13,7 @@ local gs = root:WaitForChild("GameState")
 local HUD = require(script.Parent.HUD)
 local Effects = require(script.Parent.Effects)
 local Spectate = require(script.Parent.Spectate)
+local Ambience = require(script.Parent.Ambience)
 
 local player = Players.LocalPlayer
 local grabbed = false
@@ -21,14 +21,25 @@ local grabbed = false
 HUD.init()
 Effects.init()
 Spectate.init(HUD.setSpectate)
+Ambience.init()
 
 local function send(kind: string, data: any?)
 	toServer:FireServer(kind, data)
 end
 
 ---------------------------------------------------------------- 게임 상태
+local lastPhase = ""
 local function refreshState()
 	local phase = (gs:GetAttribute("Phase") :: string?) or "Waiting"
+	if phase ~= lastPhase then
+		lastPhase = phase
+		if phase ~= "Playing" then
+			Ambience.setHunted(false)
+		end
+		if phase == "Ended" and gs:GetAttribute("Result") == "Win" then
+			Ambience.play(Config.Sounds.Win, 0.7, 1)
+		end
+	end
 	HUD.setPhase(phase)
 	HUD.setTimer((gs:GetAttribute("TimeLeft") :: number?) or 0)
 	HUD.setBuckets((gs:GetAttribute("Buckets") :: number?) or 0, (gs:GetAttribute("Target") :: number?) or 0)
@@ -65,7 +76,9 @@ end
 player:GetAttributeChangedSignal("Fill"):Connect(refreshGauge)
 player:GetAttributeChangedSignal("Filling"):Connect(refreshGauge)
 player:GetAttributeChangedSignal("Threat"):Connect(function()
-	Effects.setThreat((player:GetAttribute("Threat") :: number?) or 0)
+	local t = (player:GetAttribute("Threat") :: number?) or 0
+	Effects.setThreat(t)
+	Ambience.setThreat(t)
 end)
 player:GetAttributeChangedSignal("Awareness"):Connect(function()
 	HUD.setAwareness((player:GetAttribute("Awareness") :: number?) or 0)
@@ -90,17 +103,7 @@ player:GetAttributeChangedSignal("Admin"):Connect(function()
 end)
 
 ---------------------------------------------------------------- 서버 메시지
-local function playUi(id: string, volume: number, pitch: number)
-	local s = Instance.new("Sound")
-	s.SoundId = id
-	s.Volume = volume
-	s.PlaybackSpeed = pitch
-	s.Parent = SoundService
-	s:Play()
-	s.Ended:Once(function()
-		s:Destroy()
-	end)
-end
+local playUi = Ambience.play
 
 toClient.OnClientEvent:Connect(function(kind: string, data: any)
 	if kind == "Notify" then
@@ -126,14 +129,16 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		Effects.shake(data.Time or 2.5, 10)
 		Effects.flash(0.2, data.Time or 2.5)
 	elseif kind == "Lantern" then
-		playUi(Config.Sounds.Click, 0.5, if data.On then 1.4 else 1.1)
+		playUi(Config.Sounds.Click, 0.5, if data.On then 1.1 else 0.95)
 	elseif kind == "Trapped" then
 		Effects.shake(0.5, 8)
 		Effects.flash(0.5, 0.6)
-		playUi(Config.Sounds.TrapSnap, 1, 0.6)
+		playUi(Config.Sounds.TrapSnap, 0.6, 1)
 	elseif kind == "Hunt" then
 		HUD.setGhost(data.State, data.Target == player.Name)
+		Ambience.setHunted(data.State == "Hunting" and data.Target == player.Name)
 		if data.State == "Hunting" and data.Target == player.Name then
+			playUi(Config.Sounds.Stinger, 0.9, 1)
 			Effects.setWarning(true)
 			HUD.banner("귀신이 당신을 발견했다! 랜턴을 끄고 도망쳐라!", 3)
 			task.delay(1.2, function()
@@ -144,13 +149,14 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		end
 	elseif kind == "Sfx" then
 		if data == "Fill" then
-			playUi(Config.Sounds.Swim, 0.6, 1.2)
+			playUi(Config.Sounds.Fill, 0.6, 1)
 		elseif data == "Pour" then
-			playUi(Config.Sounds.Pour, 0.7, 0.8)
+			playUi(Config.Sounds.Pour, 0.5, 1)
 		elseif data == "Gate" then
-			playUi(Config.Sounds.Gate, 0.8, 0.5)
+			playUi(Config.Sounds.Gate, 0.5, 0.9)
 		elseif data == "Seal" then
-			playUi(Config.Sounds.Scream, 1, 0.3)
+			playUi(Config.Sounds.Bell, 1, 0.8)
+			playUi(Config.Sounds.Rumble, 0.8, 1, 6)
 			Effects.shake(2.5, 4)
 		end
 	end

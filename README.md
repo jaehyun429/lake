@@ -66,6 +66,8 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 | 덫 | 12 + 3×인원, 길 중심선 ±5, 간격 9, 40초 후 재장전, 3초 속박 | `Traps`, `Player.TrapSlowTime` |
 | 맵 | 호수 반경 92, 캠프 z=+150(안전지대 28), 사당 (0,−168)/(−160,−40)/(160,10), 출구 z=+195 | `Map` |
 
+| 소리 | 밤 풀벌레 + 물가에 가까우면 물결 소리, 위협이 오르면 저음·심장박동, 쫓기면 추격 음악, 귀신 75스터드 안에서 속삭임, 18~45초마다 멀리서 부엉이·나뭇가지·바람. 소리 ID 는 Roblox 공개 라이브러리 | `Sounds`, `Audio` |
+
 ### 첫 플레이 테스트 체크리스트
 - 랜턴 없이 덫이 정말 안 보이는가? (너무 잘 보이면 `Lighting` 더 어둡게, 너무 안 보이면 `Lantern.Range` ↑)
 - 랜턴을 끄고 달릴 때 길·나룻배·나무 윤곽이 보이는가? (밤이라 태양광이 없어 `default.project.json` 의 Lighting.OutdoorAmbient / Ambient / ExposureCompensation 이 실제 밝기. Rojo Connect 후 Accept 해야 Studio Lighting 에 반영됨)
@@ -124,6 +126,7 @@ src/server/Net.luau          RemoteEvent 래퍼 / PlayerState.luau 상태 헬퍼
 src/client/Main.client.luau  입력(달리기·연타), 서버 메시지 처리
 src/client/HUD.luau          타이머·양동이·배너·게이지·연타·결과 UI
 src/client/Effects.luau      비네트·심장박동·흔들림
+src/client/Ambience.luau     밤 풀벌레·호숫가 물결·위협 저음·추격 음악·멀리서 들리는 소리
 src/client/Spectate.luau     관전 카메라
 tools/check.sh               luau-analyze + stylua + rojo build
 tools/preview/               Studio 없이 파트 모델을 luau+Blender 로 렌더해 보는 도구

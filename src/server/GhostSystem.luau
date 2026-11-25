@@ -149,7 +149,7 @@ local function emergeEffects()
 	local wp = Vector3.new(gPos.X, M.WaterLevel, gPos.Z)
 	GhostBuilder.ripple(wp, map.Folder, 1.6)
 	GhostBuilder.splash(wp, map.Folder)
-	Util.playAt(wp + Vector3.new(0, 4, 0), Config.Sounds.Scream, 1, 0.45)
+	Util.playAt(wp + Vector3.new(0, 4, 0), Config.Sounds.Scream, 1, 0.9)
 end
 
 local function startHunt(player: Player, pos: Vector3)
@@ -275,7 +275,7 @@ local function drag(player: Player, s: PState)
 		dirToLake = dirToLake.Unit
 		local shore = M.LakeCenter - dirToLake * (M.LakeRadius - 12)
 		local target = Vector3.new(shore.X, M.WaterLevel - 9, shore.Z)
-		Util.playAt(root.Position, Config.Sounds.Grab, 1, 0.8)
+		Util.playAt(root.Position, Config.Sounds.Grab, 1, 0.85)
 		root.Anchored = true
 		hum.PlatformStand = true
 		local goal = CFrame.lookAt(target, target + dirToLake) * CFrame.Angles(math.rad(-70), 0, 0)
@@ -307,8 +307,8 @@ local function grab(player: Player, s: PState, root: BasePart, hum: Humanoid)
 	root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, select(2, root.CFrame:ToOrientation()), 0)
 	root.Anchored = true
 	hum.PlatformStand = true
-	Util.playAt(root.Position, Config.Sounds.Grab, 1, 0.6)
-	Util.playAt(root.Position, Config.Sounds.Scream, 0.8, 0.6)
+	Util.playAt(root.Position, Config.Sounds.Grab, 1, 1)
+	Util.playAt(root.Position, Config.Sounds.Scream, 0.8, 1)
 	-- 귀신은 플레이어 바로 뒤에 서서 붙잡음
 	gLook = flat(root.CFrame.LookVector)
 	local behind = root.Position - flat(root.CFrame.LookVector).Unit * 2.5
@@ -347,7 +347,7 @@ function GhostSystem.seal()
 			Net.notify(player, "귀신의 손아귀가 풀렸다!", 3)
 		end
 	end
-	Util.playAt(gPos + Vector3.new(0, 5, 0), Config.Sounds.Scream, 1, 0.35)
+	Util.playAt(gPos + Vector3.new(0, 5, 0), Config.Sounds.Scream, 1, 0.7)
 	Net.broadcast("Hunt", { State = "Sealed" })
 end
 
@@ -594,6 +594,17 @@ function GhostSystem.init(mapInfo: any, context: typeof(ctx))
 	gLook = flat(map.GhostIdleCFrame.LookVector)
 	nextSubmerge = rng:NextNumber(G.SubmergeMin, G.SubmergeMax)
 	placeBody()
+	-- 귀신 몸에서 나는 속삭임: 가까이 올수록 크게 들림
+	if body.PrimaryPart then
+		Util.sound(body.PrimaryPart, Config.Sounds.GhostLoop, {
+			Name = "Whisper",
+			Looped = true,
+			Volume = Config.Audio.GhostLoopVolume,
+			RollOffMode = Enum.RollOffMode.Linear,
+			RollOffMinDistance = 6,
+			RollOffMaxDistance = Config.Audio.GhostLoopRange,
+		}):Play()
+	end
 
 	Net.on("Mash", function(player)
 		local s = states[player]

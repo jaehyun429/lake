@@ -127,7 +127,7 @@ function WaterSystem.dropBucket(player: Player, spill: boolean?)
 		Net.notify(player, "물을 쏟았습니다.", 2.5)
 		local root = PlayerState.getRoot(player)
 		if root then
-			Util.playAt(root.Position, Config.Sounds.Splash, 0.6, 1.2)
+			Util.playAt(root.Position, Config.Sounds.Splash, 0.6, 1.1)
 		end
 	end
 end
@@ -184,7 +184,7 @@ function WaterSystem.tryDeliver(player: Player, shrine: any)
 		return
 	end
 	WaterSystem.dropBucket(player, false)
-	Util.playAt(vessel.Position, Config.Sounds.Pour, 0.8, 1.1)
+	Util.playAt(vessel.Position, Config.Sounds.Pour, 0.8, 1)
 	Net.send(player, "Sfx", "Pour")
 end
 

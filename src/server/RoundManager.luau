@@ -138,7 +138,7 @@ local function setGate(open: boolean)
 	end
 	panel.CanCollide = not open
 	if open then
-		Util.playAt(base, Config.Sounds.Gate, 1, 0.5)
+		Util.playAt(base, Config.Sounds.Gate, 1, 0.9)
 	end
 end
 

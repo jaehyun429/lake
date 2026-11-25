@@ -124,7 +124,7 @@ function LanternSystem.set(player: Player, on: boolean)
 	applyState(player, on)
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if root then
-		Util.playAt(root.Position, Config.Sounds.Click, 0.5, if on then 1.4 else 1.1)
+		Util.playAt(root.Position, Config.Sounds.Click, 0.5, if on then 1.1 else 0.95)
 	end
 	Net.send(player, "Lantern", { On = on })
 end

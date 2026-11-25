@@ -161,7 +161,7 @@ function GhostBuilder.splash(position: Vector3, parent: Instance)
 	e.Rate = 0
 	e.Parent = p
 	e:Emit(40)
-	Util.playAt(position, Config.Sounds.Splash, 1, 0.9)
+	Util.playAt(position, Config.Sounds.Splash, 1, 1)
 	Debris:AddItem(p, 2)
 end
 

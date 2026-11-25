@@ -19,7 +19,6 @@ local redFlash: Frame
 local threat = 0
 local warning = false
 local heartbeat: Sound
-local heartbeat2: Sound
 local shakeUntil = 0
 local shakeStrength = 0
 local lanternOn = false
@@ -65,32 +64,14 @@ function Effects.init()
 	redFlash.Size = UDim2.fromScale(1, 1)
 	redFlash.Parent = gui
 
+	-- 심장박동 루프 (위협이 높을수록 빠르고 큼)
 	heartbeat = Instance.new("Sound")
+	heartbeat.Name = "Heartbeat"
 	heartbeat.SoundId = Config.Sounds.Heartbeat
 	heartbeat.Volume = 0
-	heartbeat.PlaybackSpeed = 0.35
+	heartbeat.Looped = true
 	heartbeat.Parent = SoundService
-	heartbeat2 = heartbeat:Clone()
-	heartbeat2.PlaybackSpeed = 0.3
-	heartbeat2.Parent = SoundService
-
-	-- 심장박동 루프 (위협이 높을수록 빠르고 큼)
-	task.spawn(function()
-		while true do
-			local level = math.max(threat, if warning then 1 else 0)
-			if level > 0.25 then
-				local vol = (level - 0.25) / 0.75
-				heartbeat.Volume = 0.25 + vol * 0.6
-				heartbeat2.Volume = heartbeat.Volume * 0.8
-				heartbeat:Play()
-				task.wait(0.16)
-				heartbeat2:Play()
-				task.wait(math.max(0.25, 1.1 - level * 0.75))
-			else
-				task.wait(0.2)
-			end
-		end
-	end)
+	heartbeat:Play()
 
 	-- 본인 화면용 원뿔 빛: 카메라 아래의 파트는 복제되지 않음(다른 사람은 머리의 빛을 봄)
 	beamPart = Instance.new("Part")
@@ -144,6 +125,9 @@ function Effects.init()
 
 		local level = math.max(threat, if warning then 1 else 0)
 		local alpha = math.clamp((level - 0.2) / 0.8, 0, 1)
+		local beat = math.clamp((level - 0.25) / 0.75, 0, 1)
+		heartbeat.Volume += (beat * Config.Audio.HeartbeatVolume - heartbeat.Volume) * math.min(1, dt * 3)
+		heartbeat.PlaybackSpeed = 0.85 + beat * 0.6
 		local pulse = if level > 0.6 then (math.sin(os.clock() * 6) * 0.5 + 0.5) * 0.15 else 0
 		local dark = math.min(1, alpha * 0.75 + pulse + L.ScreenVignette * lanternAlpha)
 		if adminBright then

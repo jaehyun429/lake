@@ -110,18 +110,56 @@ Config.Map = {
 	},
 }
 
--- Roblox 내장 효과음 임시 사용. 라이브러리 사운드 ID(rbxassetid://...)로 교체하세요.
+-- 효과음·환경음. Roblox 가 라이선스한 공개 라이브러리(ProSoundEffects / APMOfficial) 소리라 누구나 쓸 수 있음.
+-- 마음에 안 드는 소리는 Studio Toolbox → Audio 에서 골라 ID 만 바꾸면 됨.
+local function id(n: number): string
+	return "rbxassetid://" .. n
+end
 Config.Sounds = {
-	Splash = "rbxasset://sounds/impact_water.mp3",
-	Heartbeat = "rbxasset://sounds/impact_explosion_03.mp3",
-	Swim = "rbxasset://sounds/action_swim.mp3",
-	Grab = "rbxasset://sounds/action_falling.ogg",
-	Pour = "rbxasset://sounds/action_swim.mp3",
-	Gate = "rbxasset://sounds/action_get_up.mp3",
-	TrapSnap = "rbxasset://sounds/action_jump_land.mp3",
-	Scream = "rbxasset://sounds/ouch.ogg",
-	Click = "rbxasset://sounds/action_jump.mp3",
-	Footstep = "rbxasset://sounds/action_footsteps_plastic.mp3",
+	-- 일회성 효과음
+	Splash = id(9120585252), -- 큰 물보라 (귀신이 솟을 때, 물 쏟을 때)
+	Fill = id(9117823374), -- 양동이에 물이 찼을 때
+	Pour = id(9120575856), -- 항아리에 붓기
+	Grab = id(9113980319), -- 붙잡힘: 괴물 으르렁
+	Scream = id(9043346594), -- 귀신 비명
+	TrapSnap = id(9116723292), -- 덫 쇳소리
+	Click = id(9114480271), -- 랜턴 딸깍
+	Gate = id(9120877884), -- 출구 문 삐걱
+	Stinger = id(9047014318), -- 귀신이 나를 발견했을 때
+	Bell = id(9125597663), -- 봉인: 절 종소리
+	Rumble = id(9112824733), -- 봉인: 낮은 울림
+	Win = id(9042971851), -- 탈출 성공
+	-- 계속 도는 소리
+	Night = id(9112764573), -- 밤 풀벌레
+	Lake = id(9116203162), -- 호숫가 물결 (물가에 가까울수록 큼)
+	Drone = id(9114353539), -- 불길한 저음 (위협이 높을수록 큼)
+	Chase = id(1843867314), -- 쫓길 때 음악
+	Heartbeat = id(9043365842), -- 심장박동 (96BPM 루프)
+	GhostLoop = id(9125440168), -- 귀신 몸에서 나는 속삭임 (가까이 오면 들림)
+	-- 가끔 멀리서 들리는 소리 (부엉이, 나뭇가지, 바람)
+	Distant = {
+		id(9117181540),
+		id(9117181875),
+		id(9120258937),
+		id(9119232293),
+		id(9120697823),
+		id(9120698168),
+	},
+}
+
+-- 소리 크기 (0 이면 꺼짐)
+Config.Audio = {
+	NightVolume = 0.3,
+	LakeVolume = 0.5, -- 물가에 섰을 때 최대
+	LakeFalloff = 60, -- 물가에서 이만큼 멀어지면 안 들림
+	DroneVolume = 0.6, -- 위협 최대일 때
+	ChaseVolume = 0.7,
+	HeartbeatVolume = 0.9,
+	GhostLoopVolume = 1.2,
+	GhostLoopRange = 75, -- 귀신 속삭임이 들리는 거리
+	DistantVolume = 0.5,
+	DistantInterval = { 18, 45 }, -- 멀리서 들리는 소리 간격 (초)
+	DistantRange = { 55, 110 }, -- 플레이어로부터 거리
 }
 
 -- 관리자(테스트) 모드: P 키. 켠 사람 화면만 대낮처럼 밝아짐. Studio 안과 플레이스 소유자는 항상 허용.

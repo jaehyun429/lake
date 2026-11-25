@@ -68,7 +68,7 @@ function Util.playAt(position: Vector3, id: string, volume: number?, pitch: numb
 	holder.Parent = workspace
 	local s = Util.sound(holder, id, { Volume = volume or 0.8, PlaybackSpeed = pitch or 1 })
 	s:Play()
-	Debris:AddItem(holder, 6)
+	Debris:AddItem(holder, 12)
 end
 
 function Util.pointLight(parent: Instance, color: Color3, range: number, brightness: number): PointLight

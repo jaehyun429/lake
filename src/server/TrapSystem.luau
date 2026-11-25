@@ -99,7 +99,7 @@ local function trigger(trap: any, player: Player)
 	end
 	trap.Armed = false
 	setJaws(trap, true)
-	Util.playAt(trap.Position, Config.Sounds.TrapSnap, 1, 0.6)
+	Util.playAt(trap.Position, Config.Sounds.TrapSnap, 1, 1)
 	local _, hum = PlayerState.getRoot(player)
 	if hum then
 		-- 발이 묶임: 잠시 이동 불가
