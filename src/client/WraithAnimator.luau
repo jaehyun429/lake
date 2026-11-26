@@ -17,6 +17,8 @@ type Rig = {
 	Bones: { Bone },
 	Frames: { { CFrame } }, -- Frames[f][k] = Bones[k] 의 Transform
 	Arms: { { Arm: Bone, Hand: Bone } }, -- 붙잡을 때 뻗는 양팔
+	Spine: Bone?,
+	Head: Bone?,
 }
 
 local rig: Rig? = nil
@@ -24,11 +26,22 @@ local lastPos: Vector3? = nil
 local lastMoved = 0
 local weight = 0
 local holdWeight = 0 -- 붙잡는 자세 (양팔을 뻗음)
+local Gait = Config.Gait
+local rng = Random.new()
+local nextTwitch = 0
+local twitchUntil = 0
+local twitchAngle = -1
 local clock = 0
 local nextSearch = 0
 
 local function key(name: string): string
 	return string.lower(string.match(name, "[^:]+$") or name)
+end
+
+-- 월드 기준 회전을 그 뼈의 로컬 회전으로 바꿈 (기본 자세 기준)
+local function localTurn(bone: Bone, worldRotation: CFrame): CFrame
+	local restRot = bone.WorldCFrame.Rotation
+	return restRot:Inverse() * worldRotation * restRot
 end
 
 local function frameOf(origin: Vector3, up: Vector3, side: Vector3): CFrame
@@ -102,7 +115,7 @@ local function setup(ghost: Model): Rig?
 			table.insert(arms, { Arm = arm, Hand = hand })
 		end
 	end
-	return { Ghost = ghost, Bones = bones, Frames = frames, Arms = arms }
+	return { Ghost = ghost, Bones = bones, Frames = frames, Arms = arms, Spine = byName.spine, Head = byName.head }
 end
 
 local function findGhost(): Model?
@@ -147,21 +160,44 @@ local function step(dt: number)
 	local goal = if moving then 1 else 0
 	local before = weight
 	weight += math.clamp(goal - weight, -dt * 4, dt * 4)
+	local pivotCf = r.Ghost:GetPivot()
+	local right, look = pivotCf.RightVector, pivotCf.LookVector
 	if weight > 0 or before > 0 then
-		clock += dt * Data.Fps * Config.Assets.WraithRunSpeed
+		clock += dt * Data.Fps * Gait.Speed
 		local n = #r.Frames
 		local t = clock % n
+		-- 스톱모션처럼 뚝뚝 끊어서 재생 (StepFps 가 0 이면 부드럽게)
+		if Gait.StepFps > 0 then
+			local hold = Data.Fps / Gait.StepFps
+			t = (math.floor(clock / hold) * hold) % n
+		end
 		local a = math.floor(t)
-		local alpha = t - a
+		local alpha = if Gait.StepFps > 0 then 0 else t - a
 		local fa = r.Frames[a + 1]
 		local fb = r.Frames[(a + 1) % n + 1]
 		for k, bone in r.Bones do
 			local pose = fa[k]:Lerp(fb[k], alpha)
 			bone.Transform = if weight >= 1 then pose else CFrame.identity:Lerp(pose, weight)
 		end
+
+		-- 상체를 앞으로 꺾음
+		if r.Spine and Gait.Lean ~= 0 then
+			r.Spine.Transform = localTurn(r.Spine, CFrame.fromAxisAngle(right, -math.rad(Gait.Lean) * weight)) * r.Spine.Transform
+		end
+		-- 목을 옆으로 꺾고, 가끔 반대쪽으로 홱 꺾이는 경련
+		if r.Head and Gait.HeadTilt ~= 0 then
+			if now >= nextTwitch then
+				nextTwitch = now + rng:NextNumber(Gait.TwitchInterval[1], Gait.TwitchInterval[2])
+				twitchUntil = now + rng:NextNumber(0.08, 0.22)
+				twitchAngle = rng:NextNumber(-1.4, -0.5)
+			end
+			local tilt = math.rad(Gait.HeadTilt) * (if now < twitchUntil then twitchAngle else 1) * weight
+			local nod = math.rad(Gait.Lean * 0.6) * weight -- 상체가 숙여진 만큼 고개는 들어 앞을 봄
+			r.Head.Transform = localTurn(r.Head, CFrame.fromAxisAngle(look, tilt) * CFrame.fromAxisAngle(right, nod))
+		end
 	end
 
-	-- 누군가 붙잡혀 있으면 양팔을 그 사람 몸 쪽으로 뻗음 (어깨에서 통째로 돌림)
+	-- 양팔: 누군가 붙잡혀 있으면 그 사람 몸 쪽으로, 쫓는 중이면 앞으로 뻗음 (어깨에서 통째로 돌림)
 	local heldRoot: BasePart? = nil
 	for _, p in Players:GetPlayers() do
 		if p:GetAttribute("Status") == "Grabbed" then
@@ -175,21 +211,28 @@ local function step(dt: number)
 	end
 	local holdBefore = holdWeight
 	holdWeight += math.clamp((if heldRoot then 1 else 0) - holdWeight, -dt * 5, dt * 5)
-	if holdWeight > 0 or holdBefore > 0 then
-		local right = r.Ghost:GetPivot().RightVector
-		for _, arm in r.Arms do
+	local reachWeight = math.max(holdWeight, weight * Gait.ArmsReach)
+	if reachWeight > 0 or holdBefore > 0 or before > 0 then
+		for index, arm in r.Arms do
 			local restCf = arm.Arm.WorldCFrame
 			local shoulder = restCf.Position
 			local reach = arm.Hand.WorldPosition - shoulder
 			local turn = CFrame.identity
-			if heldRoot and reach.Magnitude > 0.01 then
-				-- 왼손은 몸 왼쪽, 오른손은 몸 오른쪽을 잡음
+			if reachWeight > 0 and reach.Magnitude > 0.01 then
+				-- 왼손은 왼쪽, 오른손은 오른쪽
 				local sideSign = if reach:Dot(right) >= 0 then 1 else -1
-				local to = heldRoot.Position + right * sideSign * 0.9 - shoulder
+				local to: Vector3
+				if heldRoot then
+					to = heldRoot.Position + right * sideSign * 0.9 - shoulder
+				else
+					-- 한 팔은 높게, 한 팔은 낮게 뻗고 천천히 흔들림
+					local sway = math.sin(now * 2.3 + index * 2.1) * 0.12
+					to = look + Vector3.yAxis * ((if index == 1 then -0.05 else -0.45) + sway) + right * sideSign * 0.12
+				end
 				local axis = reach:Cross(to)
 				if to.Magnitude > 0.01 and axis.Magnitude > 1e-4 then
 					local angle = math.acos(math.clamp(reach.Unit:Dot(to.Unit), -1, 1))
-					local swing = CFrame.new(shoulder) * CFrame.fromAxisAngle(axis.Unit, angle * holdWeight) * CFrame.new(-shoulder)
+					local swing = CFrame.new(shoulder) * CFrame.fromAxisAngle(axis.Unit, angle * reachWeight) * CFrame.new(-shoulder)
 					turn = restCf:Inverse() * swing * restCf
 				end
 			end

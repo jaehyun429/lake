@@ -167,6 +167,16 @@ Config.Audio = {
 	DistantRange = { 55, 110 }, -- 플레이어로부터 거리
 }
 
+-- 귀신이 쫓아올 때의 몸짓 (Baked 동작 위에 덧씌움). 전부 0 으로 두면 원래의 평범한 달리기
+Config.Gait = {
+	Speed = 0.8, -- 다리 움직임 속도 배율
+	StepFps = 11, -- 초당 몇 장으로 끊어 보일지 (스톱모션처럼 뚝뚝 끊김. 0 이면 부드럽게)
+	Lean = 24, -- 상체를 앞으로 꺾는 각도
+	HeadTilt = 32, -- 목을 옆으로 꺾는 각도
+	TwitchInterval = { 0.5, 1.8 }, -- 목이 반대쪽으로 홱 꺾이는 경련 간격 (초)
+	ArmsReach = 0.85, -- 팔을 휘젓는 대신 앞으로 뻗는 정도 (0 = 달리기 팔, 1 = 완전히 뻗음)
+}
+
 -- 귀신 연출 (내 화면에서만)
 Config.Scare = {
 	-- 붙잡힘 장면: 귀신이 양손으로 나를 들어 올리고, 카메라가 내 어깨 너머로 귀신 얼굴을 클로즈업
@@ -204,7 +214,6 @@ Config.Assets = {
 	-- 귀신 달리기 동작: "Baked" = 코드가 뼈를 직접 움직임(권장, Studio 애니메이션 임포트 불필요) /
 	-- "Keyframe" = Studio 로 가져온 애니메이션 사용(누워서 달리면 Baked 로) / "None" = 동작 없이 미끄러짐
 	WraithAnimation = "Baked",
-	WraithRunSpeed = 1, -- Baked 재생 속도 배율
 	WraithRunAnimationId = "", -- Keyframe 일 때: 업로드한 애니메이션 ID. 비우면 모델 안의 KeyframeSequence 사용
 	BucketHeight = 1.6, -- 들고 다니는 양동이 높이
 	JarHeight = 4.2, -- 제단 항아리 높이
