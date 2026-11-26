@@ -19,6 +19,9 @@ type Rig = {
 	Arms: { { Arm: Bone, Hand: Bone } }, -- 붙잡을 때 뻗는 양팔
 	Spine: Bone?,
 	Head: Bone?,
+	Hips: Bone,
+	Legs: { Bone },
+	HipRestHeight: number,
 }
 
 local rig: Rig? = nil
@@ -115,7 +118,22 @@ local function setup(ghost: Model): Rig?
 			table.insert(arms, { Arm = arm, Hand = hand })
 		end
 	end
-	return { Ghost = ghost, Bones = bones, Frames = frames, Arms = arms, Spine = byName.spine, Head = byName.head }
+	return {
+		Ghost = ghost,
+		Bones = bones,
+		Frames = frames,
+		Arms = arms,
+		Spine = byName.spine,
+		Head = byName.head,
+		Hips = hips,
+		Legs = { byName.leftupleg, byName.rightupleg },
+		-- 서 있을 때 엉덩이가 땅에서 얼마나 높은지 (발 뼈는 발목 높이라 조금 더함)
+		HipRestHeight = hips.WorldPosition.Y - math.min(
+			if byName.leftfoot then byName.leftfoot.WorldPosition.Y else math.huge,
+			if byName.rightfoot then byName.rightfoot.WorldPosition.Y else math.huge,
+			hips.WorldPosition.Y - 6
+		) + 0.9,
+	}
 end
 
 local function findGhost(): Model?
@@ -124,12 +142,145 @@ local function findGhost(): Model?
 	return if ghost and ghost:IsA("Model") then ghost else nil
 end
 
+-- 목: 옆으로 꺾인 각도 (가끔 반대쪽으로 홱 꺾이는 경련 포함)
+local function headTilt(now: number): number
+	if now >= nextTwitch then
+		nextTwitch = now + rng:NextNumber(Gait.TwitchInterval[1], Gait.TwitchInterval[2])
+		twitchUntil = now + rng:NextNumber(0.08, 0.22)
+		twitchAngle = rng:NextNumber(-1.4, -0.5)
+	end
+	return math.rad(Gait.HeadTilt) * (if now < twitchUntil then twitchAngle else 1)
+end
+
+-- 팔을 어깨에서 통째로 돌려 손이 toRest 방향(기본 자세 기준)을 향하게 함
+local function aimArm(arm: { Arm: Bone, Hand: Bone }, toRest: Vector3, amount: number)
+	local restCf = arm.Arm.WorldCFrame
+	local shoulder = restCf.Position
+	local reach = arm.Hand.WorldPosition - shoulder
+	local turn = CFrame.identity
+	if amount > 0 and reach.Magnitude > 0.01 and toRest.Magnitude > 0.01 then
+		local axis = reach:Cross(toRest)
+		if axis.Magnitude > 1e-4 then
+			local angle = math.acos(math.clamp(reach.Unit:Dot(toRest.Unit), -1, 1))
+			local swing = CFrame.new(shoulder) * CFrame.fromAxisAngle(axis.Unit, angle * amount) * CFrame.new(-shoulder)
+			turn = restCf:Inverse() * swing * restCf
+		end
+	end
+	arm.Arm.Transform = turn
+end
+
+-- 붙잡힌 사람의 발목 위치 (없으면 nil)
+local function heldAnkles(ghostPos: Vector3): Vector3?
+	for _, p in Players:GetPlayers() do
+		if p:GetAttribute("Status") == "Grabbed" then
+			local char = p.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if hrp and hrp:IsA("BasePart") and (hrp.Position - ghostPos).Magnitude < 30 then
+				return hrp.Position - hrp.CFrame.UpVector * 2.7
+			end
+		end
+	end
+	return nil
+end
+
+-- 엎드려 기는 자세. w = 0(서 있음) ~ 1(완전히 엎드림)
+local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Vector3?)
+	local right, look, up = pivotCf.RightVector, pivotCf.LookVector, Vector3.yAxis
+	local phase = clock * math.pi * 2
+	if Gait.StepFps > 0 then
+		phase = math.floor(clock * Gait.StepFps / Gait.CrawlSpeed) / (Gait.StepFps / Gait.CrawlSpeed) * math.pi * 2
+	end
+
+	-- 엉덩이: 몸 전체를 앞으로 눕히고 땅까지 내림. 좌우로 뒤틀리며 기어감
+	local restCf = r.Hips.WorldCFrame
+	local p = restCf.Position
+	local bodyRot = CFrame.fromAxisAngle(look, math.sin(phase) * math.rad(Gait.Slither) * w)
+		* CFrame.fromAxisAngle(up, math.cos(phase) * math.rad(Gait.Slither) * 0.6 * w)
+		* CFrame.fromAxisAngle(right, -math.rad(Gait.Pitch) * w)
+	local offset = (-up * (r.HipRestHeight - Gait.HipHeight) - look * Gait.BodyBack) * w
+	r.Hips.Transform = restCf:Inverse() * (CFrame.new(p + offset) * bodyRot * CFrame.new(-p)) * restCf
+
+	-- 가슴을 들어 올림
+	local chestRot = bodyRot
+	if r.Spine then
+		local arch = CFrame.fromAxisAngle(right, math.rad(Gait.Arch) * w)
+		r.Spine.Transform = localTurn(r.Spine, bodyRot:Inverse() * arch * bodyRot)
+		chestRot = arch * bodyRot
+	end
+	local toRest = chestRot:Inverse()
+
+	-- 고개를 들어 앞을 보고, 목은 옆으로 꺾임
+	if r.Head then
+		local turn = CFrame.fromAxisAngle(look, headTilt(now) * w) * CFrame.fromAxisAngle(right, math.rad(Gait.HeadUp) * w)
+		r.Head.Transform = localTurn(r.Head, toRest * turn * chestRot)
+	end
+
+	-- 양팔: 번갈아 앞으로 뻗었다가 땅을 긁으며 당김. 붙잡았으면 발목을 쥠
+	for index, arm in r.Arms do
+		local restReach = arm.Hand.WorldPosition - arm.Arm.WorldPosition
+		local sideSign = if restReach:Dot(right) >= 0 then 1 else -1
+		local to: Vector3
+		if ankles then
+			to = ankles + right * sideSign * 0.5 - arm.Arm.TransformedWorldCFrame.Position
+		else
+			local armPhase = phase + (if index == 1 then 0 else math.pi)
+			local stroke = math.sin(armPhase) -- 1 = 앞으로 쭉 뻗음, -1 = 옆으로 당겨짐
+			local angle = math.rad(45 - stroke * 32)
+			local lift = math.max(0, math.cos(armPhase)) * 0.4 -- 앞으로 내밀 때는 손을 듦
+			to = look * math.cos(angle) + right * sideSign * math.sin(angle) + up * (-0.3 + lift)
+		end
+		aimArm(arm, toRest * to, w)
+	end
+
+	-- 다리는 뒤로 끌려오며 좌우로 흔들림
+	for index, leg in r.Legs do
+		local sway = math.sin(phase + index * 2.4) * math.rad(Gait.LegSway) * w
+		leg.Transform = localTurn(leg, bodyRot:Inverse() * CFrame.fromAxisAngle(up, sway) * bodyRot)
+	end
+end
+
+-- 서서 달리는 자세 (구운 달리기 동작 + 꺾인 상체·목·뻗은 팔)
+local function run(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Vector3?, holdW: number)
+	local right, look = pivotCf.RightVector, pivotCf.LookVector
+	local n = #r.Frames
+	local t = clock % n
+	if Gait.StepFps > 0 then
+		local hold = Data.Fps / Gait.StepFps
+		t = (math.floor(clock / hold) * hold) % n
+	end
+	local a = math.floor(t)
+	local alpha = if Gait.StepFps > 0 then 0 else t - a
+	local fa = r.Frames[a + 1]
+	local fb = r.Frames[(a + 1) % n + 1]
+	for k, bone in r.Bones do
+		bone.Transform = CFrame.identity:Lerp(fa[k]:Lerp(fb[k], alpha), w)
+	end
+	if r.Spine then
+		r.Spine.Transform = localTurn(r.Spine, CFrame.fromAxisAngle(right, -math.rad(Gait.Lean) * w)) * r.Spine.Transform
+	end
+	if r.Head then
+		local nod = math.rad(Gait.Lean * 0.6) * w
+		r.Head.Transform = localTurn(r.Head, CFrame.fromAxisAngle(look, headTilt(now) * w) * CFrame.fromAxisAngle(right, nod))
+	end
+	for index, arm in r.Arms do
+		local restReach = arm.Hand.WorldPosition - arm.Arm.WorldPosition
+		local sideSign = if restReach:Dot(right) >= 0 then 1 else -1
+		if ankles then
+			aimArm(arm, ankles + right * sideSign * 0.5 - arm.Arm.WorldPosition, holdW)
+		else
+			local sway = math.sin(now * 2.3 + index * 2.1) * 0.12
+			local to = look + Vector3.yAxis * ((if index == 1 then -0.05 else -0.45) + sway) + right * sideSign * 0.12
+			aimArm(arm, to, math.max(holdW, w * Gait.ArmsReach))
+		end
+	end
+end
+
 local function step(dt: number)
 	if Config.Assets.WraithAnimation ~= "Baked" then
 		return
 	end
 	local now = os.clock()
-	if rig and (not rig.Ghost:IsDescendantOf(workspace) or not rig.Bones[1]:IsDescendantOf(rig.Ghost)) then
+	if rig and (not rig.Ghost:IsDescendantOf(workspace) or not rig.Hips:IsDescendantOf(rig.Ghost)) then
 		rig = nil
 	end
 	if not rig then
@@ -141,14 +292,16 @@ local function step(dt: number)
 		rig = if ghost then setup(ghost) else nil
 		lastPos = nil
 		weight = 0
+		holdWeight = 0
 		if not rig then
 			return
 		end
 	end
 	local r = rig :: Rig
 
-	-- 서버가 귀신을 옮기고 있으면(수평 이동) 달리는 중
-	local pos = r.Ghost:GetPivot().Position
+	-- 서버가 귀신을 옮기고 있으면(수평 이동) 움직이는 중
+	local pivotCf = r.Ghost:GetPivot()
+	local pos = pivotCf.Position
 	if lastPos then
 		local moved = Vector3.new(pos.X - lastPos.X, 0, pos.Z - lastPos.Z).Magnitude
 		if moved > 0.03 then
@@ -157,88 +310,36 @@ local function step(dt: number)
 	end
 	lastPos = pos
 	local moving = now - lastMoved < 0.3
-	local goal = if moving then 1 else 0
-	local before = weight
-	weight += math.clamp(goal - weight, -dt * 4, dt * 4)
-	local pivotCf = r.Ghost:GetPivot()
-	local right, look = pivotCf.RightVector, pivotCf.LookVector
-	if weight > 0 or before > 0 then
-		clock += dt * Data.Fps * Gait.Speed
-		local n = #r.Frames
-		local t = clock % n
-		-- 스톱모션처럼 뚝뚝 끊어서 재생 (StepFps 가 0 이면 부드럽게)
-		if Gait.StepFps > 0 then
-			local hold = Data.Fps / Gait.StepFps
-			t = (math.floor(clock / hold) * hold) % n
-		end
-		local a = math.floor(t)
-		local alpha = if Gait.StepFps > 0 then 0 else t - a
-		local fa = r.Frames[a + 1]
-		local fb = r.Frames[(a + 1) % n + 1]
-		for k, bone in r.Bones do
-			local pose = fa[k]:Lerp(fb[k], alpha)
-			bone.Transform = if weight >= 1 then pose else CFrame.identity:Lerp(pose, weight)
-		end
+	local ankles = heldAnkles(pos)
+	local crawling = Gait.Style == "Crawl"
 
-		-- 상체를 앞으로 꺾음
-		if r.Spine and Gait.Lean ~= 0 then
-			r.Spine.Transform = localTurn(r.Spine, CFrame.fromAxisAngle(right, -math.rad(Gait.Lean) * weight)) * r.Spine.Transform
-		end
-		-- 목을 옆으로 꺾고, 가끔 반대쪽으로 홱 꺾이는 경련
-		if r.Head and Gait.HeadTilt ~= 0 then
-			if now >= nextTwitch then
-				nextTwitch = now + rng:NextNumber(Gait.TwitchInterval[1], Gait.TwitchInterval[2])
-				twitchUntil = now + rng:NextNumber(0.08, 0.22)
-				twitchAngle = rng:NextNumber(-1.4, -0.5)
-			end
-			local tilt = math.rad(Gait.HeadTilt) * (if now < twitchUntil then twitchAngle else 1) * weight
-			local nod = math.rad(Gait.Lean * 0.6) * weight -- 상체가 숙여진 만큼 고개는 들어 앞을 봄
-			r.Head.Transform = localTurn(r.Head, CFrame.fromAxisAngle(look, tilt) * CFrame.fromAxisAngle(right, nod))
-		end
-	end
-
-	-- 양팔: 누군가 붙잡혀 있으면 그 사람 몸 쪽으로, 쫓는 중이면 앞으로 뻗음 (어깨에서 통째로 돌림)
-	local heldRoot: BasePart? = nil
-	for _, p in Players:GetPlayers() do
-		if p:GetAttribute("Status") == "Grabbed" then
-			local char = p.Character
-			local hrp = char and char:FindFirstChild("HumanoidRootPart")
-			if hrp and hrp:IsA("BasePart") and (hrp.Position - pos).Magnitude < 30 then
-				heldRoot = hrp
-				break
-			end
-		end
-	end
 	local holdBefore = holdWeight
-	holdWeight += math.clamp((if heldRoot then 1 else 0) - holdWeight, -dt * 5, dt * 5)
-	local reachWeight = math.max(holdWeight, weight * Gait.ArmsReach)
-	if reachWeight > 0 or holdBefore > 0 or before > 0 then
-		for index, arm in r.Arms do
-			local restCf = arm.Arm.WorldCFrame
-			local shoulder = restCf.Position
-			local reach = arm.Hand.WorldPosition - shoulder
-			local turn = CFrame.identity
-			if reachWeight > 0 and reach.Magnitude > 0.01 then
-				-- 왼손은 왼쪽, 오른손은 오른쪽
-				local sideSign = if reach:Dot(right) >= 0 then 1 else -1
-				local to: Vector3
-				if heldRoot then
-					to = heldRoot.Position + right * sideSign * 0.9 - shoulder
-				else
-					-- 한 팔은 높게, 한 팔은 낮게 뻗고 천천히 흔들림
-					local sway = math.sin(now * 2.3 + index * 2.1) * 0.12
-					to = look + Vector3.yAxis * ((if index == 1 then -0.05 else -0.45) + sway) + right * sideSign * 0.12
-				end
-				local axis = reach:Cross(to)
-				if to.Magnitude > 0.01 and axis.Magnitude > 1e-4 then
-					local angle = math.acos(math.clamp(reach.Unit:Dot(to.Unit), -1, 1))
-					local swing = CFrame.new(shoulder) * CFrame.fromAxisAngle(axis.Unit, angle * reachWeight) * CFrame.new(-shoulder)
-					turn = restCf:Inverse() * swing * restCf
-				end
-			end
-			arm.Arm.Transform = turn
-		end
+	holdWeight += math.clamp((if ankles then 1 else 0) - holdWeight, -dt * 5, dt * 5)
+	-- 기는 자세는 발목을 잡고 있는 동안에도 유지
+	local goal = if moving or (crawling and ankles ~= nil) then 1 else 0
+	local before = weight
+	weight += math.clamp(goal - weight, -dt * 3, dt * 3)
+	if weight <= 0 and before <= 0 and holdWeight <= 0 and holdBefore <= 0 then
+		return
 	end
+
+	if crawling then
+		-- 붙잡고 있을 때는 천천히 꿈틀거림
+		clock += dt * Gait.CrawlSpeed * (if moving then 1 else 0.2)
+		crawl(r, weight, now, pivotCf, ankles)
+	else
+		clock += dt * Data.Fps * Gait.RunSpeed
+		run(r, weight, now, pivotCf, ankles, holdWeight)
+	end
+end
+
+-- 귀신 얼굴의 현재 위치 (리그가 없으면 nil). 붙잡힘 장면 카메라가 사용
+function WraithAnimator.facePosition(): Vector3?
+	local r = rig
+	if r and r.Head and r.Head:IsDescendantOf(workspace) then
+		return r.Head.TransformedWorldCFrame.Position
+	end
+	return nil
 end
 
 function WraithAnimator.init()

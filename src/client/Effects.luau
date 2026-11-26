@@ -8,6 +8,7 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.DeadLake.Shared.Config)
+local WraithAnimator = require(script.Parent.WraithAnimator)
 
 local Effects = {}
 local player = Players.LocalPlayer
@@ -188,7 +189,7 @@ function Effects.init()
 		for _, f in vignette do
 			f.BackgroundTransparency = 1 - dark
 		end
-		-- 붙잡힘 장면: 내 어깨 너머로 귀신 얼굴 클로즈업, 들려 있는 내 몸이 앞에 보임
+		-- 붙잡힘 장면: 누운 내 머리맡에서 발치를 봄. 내 다리 너머로 발목을 잡은 귀신 얼굴
 		if grabShot then
 			local S = Config.Scare
 			local t = os.clock() - grabShotStart
@@ -204,12 +205,12 @@ function Effects.init()
 				away = Vector3.new(away.X, 0, away.Z)
 				away = if away.Magnitude > 0.1 then away.Unit else -pivot.CFrame.LookVector
 				local side = away:Cross(Vector3.yAxis)
-				local face = pivot.Position + Vector3.new(0, S.GrabFaceHeight, 0)
+				local face = WraithAnimator.facePosition() or (pivot.Position + Vector3.new(0, S.GrabFaceHeight, 0))
 				local push = math.min(1, t / 4) * S.ShotPushIn
 				local camPos = hrp.Position + away * (S.ShotBack - push) + side * S.ShotSide + Vector3.new(0, S.ShotUp, 0)
-				cam.CFrame = CFrame.lookAt(camPos, face:Lerp(hrp.Position, 0.2))
+				cam.CFrame = CFrame.lookAt(camPos, face)
 				cam.FieldOfView = baseFov - S.GrabZoom * math.min(1, t / 0.15)
-				faceLightPart.Position = face + away * 2.5 + Vector3.new(0, 0.5, 0)
+				faceLightPart.Position = face + away * 2 + Vector3.new(0, 1.5, 0)
 				faceLight.Brightness = S.FaceLight
 				faceLight.Enabled = S.FaceLight > 0
 				-- 1인칭에서는 내 몸이 투명하므로 이 장면 동안만 보이게
@@ -355,7 +356,7 @@ function Effects.setWarning(on: boolean)
 	end
 end
 
--- 붙잡힌 동안: 어깨 너머 카메라로 전환 / 풀리면 1인칭으로 복귀
+-- 붙잡힌 동안: 발치를 보는 카메라로 전환 / 풀리면 1인칭으로 복귀
 function Effects.setGrabShot(on: boolean)
 	if on == grabShot then
 		return
