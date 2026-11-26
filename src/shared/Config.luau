@@ -193,7 +193,7 @@ Config.Assets = {
 	ForestTreeHeight = { 16, 26 }, -- 숲 나무 높이 범위
 	ForestMeshRatio = 0.35, -- 숲 나무 중 메시로 세울 비율 (렉 걸리면 낮추기, 0 이면 전부 파트)
 	WraithHeight = 12.5, -- 귀신 키
-	WraithFacing = 180, -- 귀신이 뒤로 달리면 0 으로
+	WraithFacing = 0, -- 귀신이 뒤로 달리면 180 으로
 	-- 귀신 달리기 동작: "Baked" = 코드가 뼈를 직접 움직임(권장, Studio 애니메이션 임포트 불필요) /
 	-- "Keyframe" = Studio 로 가져온 애니메이션 사용(누워서 달리면 Baked 로) / "None" = 동작 없이 미끄러짐
 	WraithAnimation = "Baked",

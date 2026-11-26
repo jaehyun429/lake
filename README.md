@@ -94,7 +94,7 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 1. Studio 상단 **Home → Import 3D** 로 `.obj` 를 하나씩 가져옵니다 (텍스처는 같은 폴더의 `.png` 를 자동으로 읽음).
 2. Workspace 에 들어온 모델을 **ReplicatedStorage → DeadLake → Assets** 로 드래그합니다. 이름은 파일명 그대로면 됩니다.
 3. Play 하면 코드가 자동으로 찾아 씁니다. 없는 것은 기존 파트 외형으로 나옵니다.
-   크기·방향은 `Config.Assets` 에서 조정 (`WraithFacing`: 귀신이 뒤로 달리면 0, `ShrineYaw`: 사당이 호수를 등지면 180).
+   크기·방향은 `Config.Assets` 에서 조정 (`WraithFacing`: 귀신이 뒤로 달리면 180, `ShrineYaw`: 사당이 호수를 등지면 180).
 
 ### 귀신 리그 + 달리기 애니메이션 (`WraithRig.fbx`)
 
@@ -103,7 +103,7 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 2. Workspace 에 `Wraith` 모델(MeshPart `WraithMesh` + Bone 들)이 생깁니다. 임포터 창에 **Animations** 항목이 있으면 켜서 같이 가져오세요.
    없으면 **Avatar → Animation Editor** 를 열고 그 모델을 선택 → **⋯ → Import → From FBX Animation** → 같은 `WraithRig.fbx` 선택 → 이름 `Run` 으로 **Save**.
    모델 안에 `AnimSaves/Run`(KeyframeSequence) 이 생깁니다. 코드는 모델 안의 KeyframeSequence 를 자동으로 찾아 재생합니다.
-3. 모델을 **ReplicatedStorage → DeadLake → Assets** 로 옮깁니다. 크기는 코드가 `Config.Assets.WraithHeight` 로 맞추고, 뒤로 달리면 `WraithFacing` 을 0 으로.
+3. 모델을 **ReplicatedStorage → DeadLake → Assets** 로 옮깁니다. 크기는 코드가 `Config.Assets.WraithHeight` 로 맞추고, 뒤로 달리면 `WraithFacing` 을 180 으로.
    **달리기 동작은 따로 가져올 필요 없습니다.** Studio 애니메이션 임포트는 뼈 축이 어긋나 귀신이 누워서 달리는 문제가 있어,
    기본값(`Config.Assets.WraithAnimation = "Baked"`)에서는 코드가 뼈를 직접 움직입니다. 2번의 애니메이션 가져오기는 건너뛰어도 됩니다.
 4. (`WraithAnimation = "Keyframe"` 일 때만) 애니메이션을 퍼블리시해서 쓰고 싶으면 그 ID 를 `Config.Assets.WraithRunAnimationId` 에 넣으면 그쪽을 우선 사용합니다.
