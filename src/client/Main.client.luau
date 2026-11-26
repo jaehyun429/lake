@@ -144,7 +144,7 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		HUD.setGhost(data.State, data.Target == player.Name)
 		Ambience.setHunted(data.State == "Hunting" and data.Target == player.Name)
 		if data.State == "Hunting" and data.Target == player.Name then
-			playUi(Config.Sounds.Stinger, 0.9, 1)
+			playUi(Config.Sounds.Stinger, 1, 0.95)
 			Effects.setWarning(true)
 			HUD.banner("귀신이 당신을 발견했다! 랜턴을 끄고 도망쳐라!", 3)
 			task.delay(1.2, function()

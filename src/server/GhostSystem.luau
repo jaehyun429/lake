@@ -149,7 +149,6 @@ local function emergeEffects()
 	local wp = Vector3.new(gPos.X, M.WaterLevel, gPos.Z)
 	GhostBuilder.ripple(wp, map.Folder, 1.6)
 	GhostBuilder.splash(wp, map.Folder)
-	Util.playAt(wp + Vector3.new(0, 4, 0), Config.Sounds.Scream, 1, 0.9)
 end
 
 local function startHunt(player: Player, pos: Vector3)
