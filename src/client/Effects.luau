@@ -21,7 +21,10 @@ local warning = false
 local heartbeat: Sound
 local blackout: Frame
 local blackoutText: TextLabel
-local scareStart = 0 -- 붙잡힘 점프스케어 시작 시각
+local grabShot = false -- 붙잡힘 장면 카메라
+local grabShotStart = 0
+local faceLightPart: BasePart
+local faceLight: PointLight
 local baseFov = 70
 local shakeUntil = 0
 local shakeStrength = 0
@@ -87,6 +90,24 @@ function Effects.init()
 	blackoutText.ZIndex = 6
 	blackoutText.Parent = blackout
 	baseFov = (workspace.CurrentCamera or camera).FieldOfView
+
+	-- 붙잡힘 장면에서 귀신 얼굴을 비추는 빛 (내 화면에만)
+	faceLightPart = Instance.new("Part")
+	faceLightPart.Name = "GhostFaceLight"
+	faceLightPart.Size = Vector3.new(0.2, 0.2, 0.2)
+	faceLightPart.Transparency = 1
+	faceLightPart.Anchored = true
+	faceLightPart.CanCollide = false
+	faceLightPart.CanQuery = false
+	faceLightPart.CanTouch = false
+	faceLight = Instance.new("PointLight")
+	faceLight.Color = Color3.fromRGB(150, 185, 215)
+	faceLight.Range = 14
+	faceLight.Brightness = 0
+	faceLight.Shadows = false
+	faceLight.Enabled = false
+	faceLight.Parent = faceLightPart
+	faceLightPart.Parent = workspace
 
 	-- 심장박동 루프 (위협이 높을수록 빠르고 큼)
 	heartbeat = Instance.new("Sound")
@@ -167,25 +188,37 @@ function Effects.init()
 		for _, f in vignette do
 			f.BackgroundTransparency = 1 - dark
 		end
-		-- 붙잡힘 점프스케어: 화면이 뒤의 귀신 얼굴 쪽으로 홱 돌아가고 확대됨
-		local scareT = os.clock() - scareStart
-		local scareTime = Config.Scare.GrabLookTime
-		if scareT < scareTime then
+		-- 붙잡힘 장면: 내 어깨 너머로 귀신 얼굴 클로즈업, 들려 있는 내 몸이 앞에 보임
+		if grabShot then
+			local S = Config.Scare
+			local t = os.clock() - grabShotStart
 			local map = workspace:FindFirstChild("DeadLake")
 			local ghost = map and map:FindFirstChild("Ghost")
 			local pivot = ghost and ghost:IsA("Model") and ghost.PrimaryPart
-			-- 빠르게 돌아가서 머물다가 끝에서 풀림
-			local a = math.min(1, scareT / 0.12) * math.clamp((scareTime - scareT) / 0.25, 0, 1)
-			if pivot then
-				local face = pivot.Position + Vector3.new(0, Config.Scare.GrabFaceHeight, 0)
-				local pos = cam.CFrame.Position
-				if (face - pos).Magnitude > 0.5 then
-					cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(pos, face), a)
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if t > 0.6 and player:GetAttribute("Status") ~= "Grabbed" then
+				Effects.setGrabShot(false)
+			elseif pivot and char and hrp and hrp:IsA("BasePart") then
+				local away = hrp.Position - pivot.Position
+				away = Vector3.new(away.X, 0, away.Z)
+				away = if away.Magnitude > 0.1 then away.Unit else -pivot.CFrame.LookVector
+				local side = away:Cross(Vector3.yAxis)
+				local face = pivot.Position + Vector3.new(0, S.GrabFaceHeight, 0)
+				local push = math.min(1, t / 4) * S.ShotPushIn
+				local camPos = hrp.Position + away * (S.ShotBack - push) + side * S.ShotSide + Vector3.new(0, S.ShotUp, 0)
+				cam.CFrame = CFrame.lookAt(camPos, face:Lerp(hrp.Position, 0.2))
+				cam.FieldOfView = baseFov - S.GrabZoom * math.min(1, t / 0.15)
+				faceLightPart.Position = face + away * 2.5 + Vector3.new(0, 0.5, 0)
+				faceLight.Brightness = S.FaceLight
+				faceLight.Enabled = S.FaceLight > 0
+				-- 1인칭에서는 내 몸이 투명하므로 이 장면 동안만 보이게
+				for _, d in char:GetDescendants() do
+					if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then
+						d.LocalTransparencyModifier = 0
+					end
 				end
 			end
-			cam.FieldOfView = baseFov - Config.Scare.GrabZoom * a
-		elseif cam.FieldOfView ~= baseFov and scareT < scareTime + 1 then
-			cam.FieldOfView = baseFov
 		end
 		if os.clock() < shakeUntil then
 			local s = shakeStrength
@@ -322,9 +355,18 @@ function Effects.setWarning(on: boolean)
 	end
 end
 
--- 붙잡힌 순간: 귀신 얼굴을 강제로 보게 함
-function Effects.jumpscare()
-	scareStart = os.clock()
+-- 붙잡힌 동안: 어깨 너머 카메라로 전환 / 풀리면 1인칭으로 복귀
+function Effects.setGrabShot(on: boolean)
+	if on == grabShot then
+		return
+	end
+	grabShot = on
+	grabShotStart = os.clock()
+	if not on then
+		faceLight.Enabled = false
+		local cam = workspace.CurrentCamera or camera
+		cam.FieldOfView = baseFov
+	end
 end
 
 -- 호수로 끌려감: fadeIn 초 동안 어두워지고, 글씨가 떴다가 걷힘

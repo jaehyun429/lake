@@ -2,6 +2,7 @@
 -- Studio 애니메이션 임포트는 뼈 축이 어긋나 귀신이 누워서 달려서, tools/mesh/bake_anim.py 가 구운
 -- "뼈가 기본 자세에서 움직인 양"(Shared.WraithAnim)을 게임 안 뼈 위치에 맞춰 변환해 Bone.Transform 에 넣는다.
 -- 축·크기는 엉덩이·머리·양팔 뼈 위치를 보고 스스로 맞춘다. 파트로 만든 귀신이면 아무것도 안 함.
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -15,12 +16,14 @@ type Rig = {
 	Ghost: Model,
 	Bones: { Bone },
 	Frames: { { CFrame } }, -- Frames[f][k] = Bones[k] 의 Transform
+	Arms: { { Arm: Bone, Hand: Bone } }, -- 붙잡을 때 뻗는 양팔
 }
 
 local rig: Rig? = nil
 local lastPos: Vector3? = nil
 local lastMoved = 0
 local weight = 0
+local holdWeight = 0 -- 붙잡는 자세 (양팔을 뻗음)
 local clock = 0
 local nextSearch = 0
 
@@ -92,7 +95,14 @@ local function setup(ghost: Model): Rig?
 		end
 		frames[f] = out
 	end
-	return { Ghost = ghost, Bones = bones, Frames = frames }
+	local arms = {}
+	for _, sideName in { "left", "right" } do
+		local arm, hand = byName[sideName .. "arm"], byName[sideName .. "hand"]
+		if arm and hand then
+			table.insert(arms, { Arm = arm, Hand = hand })
+		end
+	end
+	return { Ghost = ghost, Bones = bones, Frames = frames, Arms = arms }
 end
 
 local function findGhost(): Model?
@@ -137,20 +147,54 @@ local function step(dt: number)
 	local goal = if moving then 1 else 0
 	local before = weight
 	weight += math.clamp(goal - weight, -dt * 4, dt * 4)
-	if weight <= 0 and before <= 0 then
-		return
+	if weight > 0 or before > 0 then
+		clock += dt * Data.Fps * Config.Assets.WraithRunSpeed
+		local n = #r.Frames
+		local t = clock % n
+		local a = math.floor(t)
+		local alpha = t - a
+		local fa = r.Frames[a + 1]
+		local fb = r.Frames[(a + 1) % n + 1]
+		for k, bone in r.Bones do
+			local pose = fa[k]:Lerp(fb[k], alpha)
+			bone.Transform = if weight >= 1 then pose else CFrame.identity:Lerp(pose, weight)
+		end
 	end
 
-	clock += dt * Data.Fps * Config.Assets.WraithRunSpeed
-	local n = #r.Frames
-	local t = clock % n
-	local a = math.floor(t)
-	local alpha = t - a
-	local fa = r.Frames[a + 1]
-	local fb = r.Frames[(a + 1) % n + 1]
-	for k, bone in r.Bones do
-		local pose = fa[k]:Lerp(fb[k], alpha)
-		bone.Transform = if weight >= 1 then pose else CFrame.identity:Lerp(pose, weight)
+	-- 누군가 붙잡혀 있으면 양팔을 그 사람 몸 쪽으로 뻗음 (어깨에서 통째로 돌림)
+	local heldRoot: BasePart? = nil
+	for _, p in Players:GetPlayers() do
+		if p:GetAttribute("Status") == "Grabbed" then
+			local char = p.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if hrp and hrp:IsA("BasePart") and (hrp.Position - pos).Magnitude < 30 then
+				heldRoot = hrp
+				break
+			end
+		end
+	end
+	local holdBefore = holdWeight
+	holdWeight += math.clamp((if heldRoot then 1 else 0) - holdWeight, -dt * 5, dt * 5)
+	if holdWeight > 0 or holdBefore > 0 then
+		local right = r.Ghost:GetPivot().RightVector
+		for _, arm in r.Arms do
+			local restCf = arm.Arm.WorldCFrame
+			local shoulder = restCf.Position
+			local reach = arm.Hand.WorldPosition - shoulder
+			local turn = CFrame.identity
+			if heldRoot and reach.Magnitude > 0.01 then
+				-- 왼손은 몸 왼쪽, 오른손은 몸 오른쪽을 잡음
+				local sideSign = if reach:Dot(right) >= 0 then 1 else -1
+				local to = heldRoot.Position + right * sideSign * 0.9 - shoulder
+				local axis = reach:Cross(to)
+				if to.Magnitude > 0.01 and axis.Magnitude > 1e-4 then
+					local angle = math.acos(math.clamp(reach.Unit:Dot(to.Unit), -1, 1))
+					local swing = CFrame.new(shoulder) * CFrame.fromAxisAngle(axis.Unit, angle * holdWeight) * CFrame.new(-shoulder)
+					turn = restCf:Inverse() * swing * restCf
+				end
+			end
+			arm.Arm.Transform = turn
+		end
 	end
 end
 

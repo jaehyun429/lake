@@ -116,7 +116,7 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		grabbed = true
 		HUD.showMash(true)
 		Effects.setWarning(true)
-		Effects.jumpscare()
+		Effects.setGrabShot(true)
 		Effects.shake(0.9, 5)
 		Effects.flash(0.4, 0.5)
 	elseif kind == "MashProgress" then
@@ -125,10 +125,12 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		grabbed = false
 		HUD.showMash(false)
 		Effects.setWarning(false)
+		Effects.setGrabShot(false)
 	elseif kind == "Dragged" then
 		grabbed = false
 		HUD.showMash(false)
 		Effects.setWarning(false)
+		Effects.setGrabShot(false)
 		Effects.shake(data.Time or 2.5, 10)
 		Effects.flash(0.2, data.Time or 2.5)
 		Effects.dragBlackout(data.Time or 2.5)

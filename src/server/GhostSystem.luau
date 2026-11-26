@@ -231,6 +231,12 @@ local function release(player: Player, s: PState, reason: string, rescuer: Playe
 		s.RescuePrompt:Destroy()
 		s.RescuePrompt = nil
 	end
+	-- 들려 있던 높이에서 땅으로 내려놓음
+	local heldRoot = PlayerState.getRoot(player)
+	if heldRoot then
+		local p = heldRoot.Position
+		heldRoot.CFrame = CFrame.new(p.X, groundY(p.X, p.Z) + 3, p.Z) * CFrame.Angles(0, select(2, heldRoot.CFrame:ToOrientation()), 0)
+	end
 	freeCharacter(player)
 	PlayerState.setStatus(player, "Alive")
 	Net.send(player, "Released", { Reason = reason })
@@ -306,23 +312,28 @@ local function grab(player: Player, s: PState, root: BasePart, hum: Humanoid)
 	s.Mash = 0
 	PlayerState.setStatus(player, "Grabbed")
 	ctx.dropBucket(player, true)
-	root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, select(2, root.CFrame:ToOrientation()), 0)
-	root.Anchored = true
-	hum.PlatformStand = true
-	Util.playAt(root.Position, Config.Sounds.Grab, 1, 1)
-	Util.playAt(root.Position, Config.Sounds.Scream, 0.8, 1)
-	-- 귀신은 플레이어 바로 뒤에 서서 붙잡음
-	gLook = flat(root.CFrame.LookVector)
-	local behind = root.Position - flat(root.CFrame.LookVector).Unit * 2.5
-	gPos = Vector3.new(behind.X, groundY(behind.X, behind.Z), behind.Z)
+	-- 귀신은 잡은 자리에 서서 플레이어를 가슴 높이로 들어 올림 (마주 보게)
+	local dir = flat(root.Position - gPos)
+	if dir.Magnitude < 0.5 then
+		dir = flat(root.CFrame.LookVector)
+	end
+	dir = dir.Unit
+	gLook = dir
+	gPos = Vector3.new(gPos.X, groundY(gPos.X, gPos.Z), gPos.Z)
 	gTarget = player
 	gState = "Holding" -- 붙잡고 있는 동안은 그 자리에 서 있음
+	local hold = gPos + dir * Config.Scare.HoldForward + Vector3.new(0, Config.Scare.HoldHeight, 0)
+	root.Anchored = true
+	hum.PlatformStand = true
+	root.CFrame = CFrame.lookAt(hold, hold - dir)
+	Util.playAt(root.Position, Config.Sounds.Grab, 1, 1)
+	Util.playAt(root.Position, Config.Sounds.Scream, 0.8, 1)
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "구조하기"
 	prompt.ObjectText = player.DisplayName
 	prompt.HoldDuration = G.RescueHoldTime
-	prompt.MaxActivationDistance = 9
+	prompt.MaxActivationDistance = 16 -- 들려 있어서 땅에 있는 팀원과 거리가 멂
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = root
 	prompt.Triggered:Connect(function(rescuer: Player)
@@ -416,8 +427,9 @@ function GhostSystem.update(dt: number)
 
 		if s.Phase == "Dragging" then
 			if root then
-				local behind = root.Position - gLook * 2.5
-				gPos = Vector3.new(behind.X, behind.Y - FEET + 2, behind.Z)
+				-- 들고 있는 자세 그대로 함께 호수로 들어감
+				local behind = root.Position - gLook * Config.Scare.HoldForward
+				gPos = Vector3.new(behind.X, behind.Y - Config.Scare.HoldHeight, behind.Z)
 			end
 			continue
 		end
