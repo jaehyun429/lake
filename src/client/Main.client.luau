@@ -144,12 +144,15 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		HUD.setGhost(data.State, data.Target == player.Name)
 		Ambience.setHunted(data.State == "Hunting" and data.Target == player.Name)
 		if data.State == "Hunting" and data.Target == player.Name then
-			playUi(Config.Sounds.Stinger, 1, 0.95)
+			playUi(Config.Sounds.Stinger, Config.Audio.StingerVolume, 0.95)
 			Effects.setWarning(true)
 			HUD.banner("귀신이 당신을 발견했다! 랜턴을 끄고 도망쳐라!", 3)
 			task.delay(1.2, function()
 				Effects.setWarning(false)
 			end)
+		elseif data.State == "Hunting" and player:GetAttribute("Status") == "Alive" then
+			-- 팀원이 발견됐을 때: 흐느낌이 작게 들림
+			playUi(Config.Sounds.Stinger, Config.Audio.StingerTeamVolume, 0.95)
 		elseif data.State == "Sealed" then
 			Effects.setWarning(false)
 		end
