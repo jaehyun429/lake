@@ -14,6 +14,7 @@ local HUD = require(script.Parent.HUD)
 local Effects = require(script.Parent.Effects)
 local Spectate = require(script.Parent.Spectate)
 local Ambience = require(script.Parent.Ambience)
+local WraithAnimator = require(script.Parent.WraithAnimator)
 
 local player = Players.LocalPlayer
 local grabbed = false
@@ -22,6 +23,7 @@ HUD.init()
 Effects.init()
 Spectate.init(HUD.setSpectate)
 Ambience.init()
+WraithAnimator.init()
 
 local function send(kind: string, data: any?)
 	toServer:FireServer(kind, data)

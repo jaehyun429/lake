@@ -1,4 +1,4 @@
--- 소리 연출: 밤 풀벌레, 호숫가 물결, 위협 저음, 추격 음악, 멀리서 들리는 소리
+-- 소리 연출: 배경 음악, 빗소리, 늪 벌레, 호숫가 물결, 위협 저음, 추격 음악, 멀리서 들리는 소리
 -- 전부 내 화면(클라이언트)에서만 재생. 크기는 Config.Audio, 소리 ID 는 Config.Sounds
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +15,8 @@ local player = Players.LocalPlayer
 local rng = Random.new()
 
 local night: Sound
+local rain: Sound
+local bgm: Sound
 local lake: Sound
 local drone: Sound
 local chase: Sound
@@ -89,6 +91,8 @@ end
 
 function Ambience.init()
 	night = loop("Night", Config.Sounds.Night)
+	rain = loop("Rain", Config.Sounds.Rain)
+	bgm = loop("Bgm", Config.Sounds.Bgm)
 	lake = loop("Lake", Config.Sounds.Lake)
 	drone = loop("Drone", Config.Sounds.Drone)
 	chase = loop("Chase", Config.Sounds.Chase)
@@ -106,7 +110,10 @@ function Ambience.init()
 		local alive = player:GetAttribute("Status") ~= "Dead"
 		local chaseTarget = if hunted and alive then A.ChaseVolume else 0
 		-- 쫓길 때는 풀벌레가 잦아들고 음악이 올라옴
-		night.Volume += ((if chaseTarget > 0 then 0.3 else 1) * A.NightVolume - night.Volume) * k
+		local calm = if chaseTarget > 0 then 0.3 else 1
+		night.Volume += (calm * A.NightVolume - night.Volume) * k
+		bgm.Volume += (calm * A.BgmVolume - bgm.Volume) * k
+		rain.Volume += (A.RainVolume - rain.Volume) * k
 		lake.Volume += (lakeTarget - lake.Volume) * k
 		drone.Volume += (math.clamp(threat, 0, 1) * A.DroneVolume - drone.Volume) * k
 		chase.Volume += (chaseTarget - chase.Volume) * math.min(1, dt * (if chaseTarget > 0 then 3 else 0.6))

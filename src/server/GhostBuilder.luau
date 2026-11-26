@@ -42,7 +42,8 @@ function GhostBuilder.buildBody(parent: Instance): Model
 		Assets.placeOnGround(wraith, Vector3.new(0, -GhostBuilder.FEET, 0), math.rad(A.WraithFacing))
 		m.PrimaryPart = pivot
 		m.WorldPivot = pivot.CFrame
-		local track = Assets.loadAnimation(wraith, A.WraithRunAnimationId)
+		-- "Baked" 면 각 클라이언트의 WraithAnimator 가 뼈를 직접 움직이므로 여기서는 재생하지 않음
+		local track = if A.WraithAnimation == "Keyframe" then Assets.loadAnimation(wraith, A.WraithRunAnimationId) else nil
 		if track then
 			track.Looped = true
 			tracks[m] = track

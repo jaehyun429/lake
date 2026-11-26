@@ -130,10 +130,12 @@ Config.Sounds = {
 	Rumble = id(9112824733), -- 봉인: 낮은 울림
 	Win = id(9042971851), -- 탈출 성공
 	-- 계속 도는 소리
-	Night = id(9112764573), -- 밤 풀벌레
+	Night = id(9112881910), -- 늪 벌레 소리
+	Rain = id(9112854440), -- 나뭇잎에 떨어지는 비
+	Bgm = id(1842083590), -- 배경 음악: 어둡고 눅눅한 질감
 	Lake = id(9116203162), -- 호숫가 물결 (물가에 가까울수록 큼)
 	Drone = id(9114353539), -- 불길한 저음 (위협이 높을수록 큼)
-	Chase = id(1843867314), -- 쫓길 때 음악
+	Chase = id(9114353372), -- 쫓길 때: 깊게 울리는 불길한 저음 (쿵쿵거리는 타격음 없는 것)
 	Heartbeat = id(9043365842), -- 심장박동 (96BPM 루프)
 	GhostLoop = id(9125440168), -- 귀신 몸에서 나는 속삭임 (가까이 오면 들림)
 	-- 가끔 멀리서 들리는 소리 (부엉이, 나뭇가지, 바람)
@@ -144,17 +146,20 @@ Config.Sounds = {
 		id(9119232293),
 		id(9120697823),
 		id(9120698168),
+		id(9120015808), -- 천둥
 	},
 }
 
 -- 소리 크기 (0 이면 꺼짐)
 Config.Audio = {
-	NightVolume = 0.3,
+	NightVolume = 0.15,
+	RainVolume = 0.4,
+	BgmVolume = 0.3,
 	LakeVolume = 0.5, -- 물가에 섰을 때 최대
 	LakeFalloff = 60, -- 물가에서 이만큼 멀어지면 안 들림
 	DroneVolume = 0.6, -- 위협 최대일 때
 	ChaseVolume = 0.7,
-	HeartbeatVolume = 0.9,
+	HeartbeatVolume = 0.5,
 	GhostLoopVolume = 1.2,
 	GhostLoopRange = 75, -- 귀신 속삭임이 들리는 거리
 	DistantVolume = 0.5,
@@ -189,7 +194,11 @@ Config.Assets = {
 	ForestMeshRatio = 0.35, -- 숲 나무 중 메시로 세울 비율 (렉 걸리면 낮추기, 0 이면 전부 파트)
 	WraithHeight = 12.5, -- 귀신 키
 	WraithFacing = 180, -- 귀신이 뒤로 달리면 0 으로
-	WraithRunAnimationId = "", -- 업로드한 달리기 애니메이션 (rbxassetid://...). 비우면 모델 안의 KeyframeSequence 사용
+	-- 귀신 달리기 동작: "Baked" = 코드가 뼈를 직접 움직임(권장, Studio 애니메이션 임포트 불필요) /
+	-- "Keyframe" = Studio 로 가져온 애니메이션 사용(누워서 달리면 Baked 로) / "None" = 동작 없이 미끄러짐
+	WraithAnimation = "Baked",
+	WraithRunSpeed = 1, -- Baked 재생 속도 배율
+	WraithRunAnimationId = "", -- Keyframe 일 때: 업로드한 애니메이션 ID. 비우면 모델 안의 KeyframeSequence 사용
 	BucketHeight = 1.6, -- 들고 다니는 양동이 높이
 	JarHeight = 4.2, -- 제단 항아리 높이
 	ShrineHeight = 14, -- 동쪽 사당 건물(Meshy 메시) 높이. 메시가 없으면 파트로 지음

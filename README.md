@@ -66,7 +66,7 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
 | 덫 | 12 + 3×인원, 길 중심선 ±5, 간격 9, 40초 후 재장전, 3초 속박 | `Traps`, `Player.TrapSlowTime` |
 | 맵 | 호수 반경 92, 캠프 z=+150(안전지대 28), 사당 (0,−168)/(−160,−40)/(160,10), 출구 z=+195 | `Map` |
 
-| 소리 | 밤 풀벌레 + 물가에 가까우면 물결 소리, 위협이 오르면 저음·심장박동, 쫓기면 추격 음악, 귀신 75스터드 안에서 속삭임, 18~45초마다 멀리서 부엉이·나뭇가지·바람. 소리 ID 는 Roblox 공개 라이브러리 | `Sounds`, `Audio` |
+| 소리 | 어둡고 눅눅한 배경 음악 + 빗소리 + 늪 벌레, 물가에 가까우면 물결 소리, 위협이 오르면 저음·심장박동, 쫓기면 추격 음악, 귀신 75스터드 안에서 속삭임, 18~45초마다 멀리서 부엉이·나뭇가지·바람·천둥. 소리 ID 는 Roblox 공개 라이브러리 | `Sounds`, `Audio` |
 | 귀신 연출 | 붙잡힌 순간 화면이 뒤의 귀신 얼굴로 돌아가며 확대(1.1초), 쫓기는 중 귀신이 40스터드 안이면 랜턴 깜빡임, 끌려가면 암전 + "호수가 당신을 삼켰다..." | `Scare` |
 
 ### 첫 플레이 테스트 체크리스트
@@ -104,7 +104,9 @@ Rojo 연결이 안 되면 `rojo build -o Deadlake.rbxl` 로 만든 파일을 Stu
    없으면 **Avatar → Animation Editor** 를 열고 그 모델을 선택 → **⋯ → Import → From FBX Animation** → 같은 `WraithRig.fbx` 선택 → 이름 `Run` 으로 **Save**.
    모델 안에 `AnimSaves/Run`(KeyframeSequence) 이 생깁니다. 코드는 모델 안의 KeyframeSequence 를 자동으로 찾아 재생합니다.
 3. 모델을 **ReplicatedStorage → DeadLake → Assets** 로 옮깁니다. 크기는 코드가 `Config.Assets.WraithHeight` 로 맞추고, 뒤로 달리면 `WraithFacing` 을 0 으로.
-4. 애니메이션을 퍼블리시해서 쓰고 싶으면 그 ID 를 `Config.Assets.WraithRunAnimationId` 에 넣으면 그쪽을 우선 사용합니다.
+   **달리기 동작은 따로 가져올 필요 없습니다.** Studio 애니메이션 임포트는 뼈 축이 어긋나 귀신이 누워서 달리는 문제가 있어,
+   기본값(`Config.Assets.WraithAnimation = "Baked"`)에서는 코드가 뼈를 직접 움직입니다. 2번의 애니메이션 가져오기는 건너뛰어도 됩니다.
+4. (`WraithAnimation = "Keyframe"` 일 때만) 애니메이션을 퍼블리시해서 쓰고 싶으면 그 ID 를 `Config.Assets.WraithRunAnimationId` 에 넣으면 그쪽을 우선 사용합니다.
 
 리그 변환은 `tools/mesh/rig_decimate.py` (Blender 의 bpy 모듈)로 했습니다: 원본 10만 삼각형 → 9,310, 스킨 가중치·UV 유지, 정점당 뼈 4개 제한. 다른 세 모델(나무·양동이·항아리)은 움직이는 부분이 없어 리그가 필요 없습니다.
 
@@ -129,6 +131,7 @@ src/client/HUD.luau          타이머·양동이·배너·게이지·연타·�
 src/client/Effects.luau      비네트·심장박동·흔들림
 src/client/Ambience.luau     밤 풀벌레·호숫가 물결·위협 저음·추격 음악·멀리서 들리는 소리
 src/client/Spectate.luau     관전 카메라
+src/client/WraithAnimator.luau 귀신 리그 달리기 동작을 코드로 직접 재생 (데이터: src/shared/WraithAnim.luau ← tools/mesh/bake_anim.py)
 tools/check.sh               luau-analyze + stylua + rojo build
 tools/preview/               Studio 없이 파트 모델을 luau+Blender 로 렌더해 보는 도구
 tools/mesh/                  Meshy FBX → 로블록스용 OBJ/FBX 변환 (삼각형 감소, 리그 유지)
