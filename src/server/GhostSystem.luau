@@ -246,6 +246,8 @@ local function release(player: Player, s: PState, reason: string, rescuer: Playe
 		local root = PlayerState.getRoot(player)
 		gLastKnown = if root then root.Position else gPos
 		Net.broadcast("Hunt", { State = "Stunned" })
+	elseif gState == "Holding" and not sealed then
+		startReturn()
 	end
 end
 
@@ -314,6 +316,7 @@ local function grab(player: Player, s: PState, root: BasePart, hum: Humanoid)
 	local behind = root.Position - flat(root.CFrame.LookVector).Unit * 2.5
 	gPos = Vector3.new(behind.X, groundY(behind.X, behind.Z), behind.Z)
 	gTarget = player
+	gState = "Holding" -- 붙잡고 있는 동안은 그 자리에 서 있음
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "구조하기"
@@ -492,6 +495,12 @@ function GhostSystem.update(dt: number)
 		gTimer -= dt
 		if gTimer <= 0 then
 			startSearch(gLastKnown or gPos)
+		end
+	elseif gState == "Holding" then
+		-- 붙잡은 사람이 나가는 등으로 사라지면 돌아감
+		local held = gTarget and states[gTarget]
+		if not held or (held.Phase ~= "Grabbed" and held.Phase ~= "Dragging") then
+			startReturn()
 		end
 	elseif gState == "Hunting" then
 		local target = gTarget
