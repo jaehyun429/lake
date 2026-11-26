@@ -20,8 +20,22 @@ type Rig = {
 	Spine: Bone?,
 	Head: Bone?,
 	Hips: Bone,
-	Legs: { Bone },
 	HipRestHeight: number,
+	Limbs: { Limb }, -- 왼손, 오른손, 왼발, 오른발
+	RestLocal: { [Bone]: CFrame }, -- 기본 자세의 뼈 CFrame (귀신 피벗 기준)
+}
+
+-- 땅을 짚는 팔·다리 하나 (어깨→팔꿈치→손 / 골반→무릎→발)
+type Limb = {
+	Upper: Bone,
+	Lower: Bone,
+	End: Bone,
+	IsArm: boolean,
+	Side: number, -- 오른쪽 1, 왼쪽 -1
+	Plant: Vector3?, -- 지금 짚고 있는 땅 위치
+	Stepping: boolean,
+	StepStart: number,
+	From: Vector3,
 }
 
 local rig: Rig? = nil
@@ -34,6 +48,7 @@ local rng = Random.new()
 local nextTwitch = 0
 local twitchUntil = 0
 local twitchAngle = -1
+local velocity = Vector3.zero -- 귀신의 수평 이동 속도 (부드럽게 추정)
 local clock = 0
 local nextSearch = 0
 
@@ -111,6 +126,36 @@ local function setup(ghost: Model): Rig?
 		end
 		frames[f] = out
 	end
+	-- 기는 동작용: 기본 자세의 뼈 위치를 피벗 기준으로 기억해 둠 (지금은 아무 뼈도 움직이지 않은 상태)
+	local pivotInv = ghost:GetPivot():Inverse()
+	local restLocal: { [Bone]: CFrame } = {}
+	for _, bone in byName do
+		restLocal[bone] = pivotInv * bone.WorldCFrame
+	end
+	local limbs: { Limb } = {}
+	for _, spec in
+		{
+			{ "leftarm", "leftforearm", "lefthand", true },
+			{ "rightarm", "rightforearm", "righthand", true },
+			{ "leftupleg", "leftleg", "leftfoot", false },
+			{ "rightupleg", "rightleg", "rightfoot", false },
+		}
+	do
+		local upper, lower, tip = byName[spec[1] :: string], byName[spec[2] :: string], byName[spec[3] :: string]
+		if upper and lower and tip then
+			table.insert(limbs, {
+				Upper = upper,
+				Lower = lower,
+				End = tip,
+				IsArm = spec[4] :: boolean,
+				Side = if restLocal[tip].Position.X >= 0 then 1 else -1,
+				Plant = nil,
+				Stepping = false,
+				StepStart = 0,
+				From = Vector3.zero,
+			})
+		end
+	end
 	local arms = {}
 	for _, sideName in { "left", "right" } do
 		local arm, hand = byName[sideName .. "arm"], byName[sideName .. "hand"]
@@ -126,7 +171,8 @@ local function setup(ghost: Model): Rig?
 		Spine = byName.spine,
 		Head = byName.head,
 		Hips = hips,
-		Legs = { byName.leftupleg, byName.rightupleg },
+		Limbs = limbs,
+		RestLocal = restLocal,
 		-- 서 있을 때 엉덩이가 땅에서 얼마나 높은지 (발 뼈는 발목 높이라 조금 더함)
 		HipRestHeight = hips.WorldPosition.Y - math.min(
 			if byName.leftfoot then byName.leftfoot.WorldPosition.Y else math.huge,
@@ -183,59 +229,135 @@ local function heldAnkles(ghostPos: Vector3): Vector3?
 	return nil
 end
 
--- 엎드려 기는 자세. w = 0(서 있음) ~ 1(완전히 엎드림)
+-- u 방향을 v 방향으로 돌리는 가장 짧은 회전
+local function rotBetween(u: Vector3, v: Vector3): CFrame
+	if u.Magnitude < 1e-4 or v.Magnitude < 1e-4 then
+		return CFrame.identity
+	end
+	local axis = u:Cross(v)
+	if axis.Magnitude < 1e-5 then
+		return CFrame.identity
+	end
+	return CFrame.fromAxisAngle(axis.Unit, math.acos(math.clamp(u.Unit:Dot(v.Unit), -1, 1)))
+end
+
+-- 관절 두 개짜리 팔·다리를 꺾어서 끝(손·발)이 target 에 닿게 함.
+-- body = 이 팔·다리가 붙은 몸통이 기본 자세에서 움직인 양, pole = 팔꿈치·무릎이 향할 방향
+local function reachLimb(limb: Limb, rest: (Bone) -> CFrame, body: CFrame, target: Vector3, pole: Vector3, w: number)
+	local ru, rl = rest(limb.Upper), rest(limb.Lower)
+	local a0, b0, c0 = ru.Position, rl.Position, rest(limb.End).Position
+	local l1, l2 = (b0 - a0).Magnitude, (c0 - b0).Magnitude
+	local a = body * a0
+	local toTarget = target - a
+	if toTarget.Magnitude < 1e-3 or l1 < 1e-3 or l2 < 1e-3 then
+		return
+	end
+	local d = math.clamp(toTarget.Magnitude, math.abs(l1 - l2) + 0.05, l1 + l2 - 0.02)
+	local dir = toTarget.Unit
+	local along = (l1 * l1 - l2 * l2 + d * d) / (2 * d)
+	local out = math.sqrt(math.max(0, l1 * l1 - along * along))
+	local bend = pole - dir * pole:Dot(dir)
+	bend = if bend.Magnitude > 1e-3 then bend.Unit else Vector3.yAxis
+	local b = a + dir * along + bend * out
+	local c = a + dir * d
+	local bodyRot = body.Rotation
+	local upperRot = rotBetween(bodyRot * (b0 - a0), b - a) * bodyRot
+	local lowerRot = rotBetween(upperRot * (c0 - b0), c - b) * upperRot
+	local tu = ru.Rotation:Inverse() * bodyRot:Inverse() * upperRot * ru.Rotation
+	local tl = rl.Rotation:Inverse() * upperRot:Inverse() * lowerRot * rl.Rotation
+	limb.Upper.Transform = CFrame.identity:Lerp(tu, w)
+	limb.Lower.Transform = CFrame.identity:Lerp(tl, w)
+end
+
+-- 네 발로 기는 자세: 손과 발을 땅의 한 지점에 짚어 두고, 몸이 지나가면 다음 지점으로 옮겨 짚음.
+-- w = 0(서 있음) ~ 1(완전히 엎드림)
 local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Vector3?)
 	local right, look, up = pivotCf.RightVector, pivotCf.LookVector, Vector3.yAxis
-	local phase = clock * math.pi * 2
-	if Gait.StepFps > 0 then
-		phase = math.floor(clock * Gait.StepFps / Gait.CrawlSpeed) / (Gait.StepFps / Gait.CrawlSpeed) * math.pi * 2
+	local function rest(bone: Bone): CFrame
+		return pivotCf * r.RestLocal[bone]
 	end
 
-	-- 엉덩이: 몸 전체를 앞으로 눕히고 땅까지 내림. 좌우로 뒤틀리며 기어감
-	local restCf = r.Hips.WorldCFrame
-	local p = restCf.Position
+	-- 몸통: 앞으로 눕히고 땅 가까이 내림. 기어가며 좌우로 뒤틀림
+	local hipsRest = rest(r.Hips)
+	local p = hipsRest.Position
+	local ground = p.Y - r.HipRestHeight
+	local phase = clock * math.pi * 2
 	local bodyRot = CFrame.fromAxisAngle(look, math.sin(phase) * math.rad(Gait.Slither) * w)
 		* CFrame.fromAxisAngle(up, math.cos(phase) * math.rad(Gait.Slither) * 0.6 * w)
 		* CFrame.fromAxisAngle(right, -math.rad(Gait.Pitch) * w)
 	local offset = (-up * (r.HipRestHeight - Gait.HipHeight) - look * Gait.BodyBack) * w
-	r.Hips.Transform = restCf:Inverse() * (CFrame.new(p + offset) * bodyRot * CFrame.new(-p)) * restCf
+	local hipsMove = CFrame.new(p + offset) * bodyRot * CFrame.new(-p)
+	r.Hips.Transform = hipsRest:Inverse() * hipsMove * hipsRest
 
-	-- 가슴을 들어 올림
-	local chestRot = bodyRot
+	-- 가슴을 살짝 들어 올림
+	local chestMove = hipsMove
 	if r.Spine then
-		local arch = CFrame.fromAxisAngle(right, math.rad(Gait.Arch) * w)
-		r.Spine.Transform = localTurn(r.Spine, bodyRot:Inverse() * arch * bodyRot)
-		chestRot = arch * bodyRot
+		local spineRest = rest(r.Spine)
+		local arch = bodyRot:Inverse() * CFrame.fromAxisAngle(right, math.rad(Gait.Arch) * w) * bodyRot
+		r.Spine.Transform = spineRest.Rotation:Inverse() * arch * spineRest.Rotation
+		chestMove = hipsMove * CFrame.new(spineRest.Position) * arch * CFrame.new(-spineRest.Position)
 	end
-	local toRest = chestRot:Inverse()
+	local chestRot = chestMove.Rotation
 
 	-- 고개를 들어 앞을 보고, 목은 옆으로 꺾임
 	if r.Head then
+		local headRest = rest(r.Head).Rotation
 		local turn = CFrame.fromAxisAngle(look, headTilt(now) * w) * CFrame.fromAxisAngle(right, math.rad(Gait.HeadUp) * w)
-		r.Head.Transform = localTurn(r.Head, toRest * turn * chestRot)
+		r.Head.Transform = headRest:Inverse() * chestRot:Inverse() * turn * chestRot * headRest
 	end
 
-	-- 양팔: 번갈아 앞으로 뻗었다가 땅을 긁으며 당김. 붙잡았으면 발목을 쥠
-	for index, arm in r.Arms do
-		local restReach = arm.Hand.WorldPosition - arm.Arm.WorldPosition
-		local sideSign = if restReach:Dot(right) >= 0 then 1 else -1
-		local to: Vector3
-		if ankles then
-			to = ankles + right * sideSign * 0.5 - arm.Arm.TransformedWorldCFrame.Position
+	-- 손발 짚기
+	local speed = velocity.Magnitude
+	local lead = if speed > 1 then velocity.Unit * math.min(1, speed / 8) * Gait.StepDistance * 0.8 else Vector3.zero
+	for index, limb in r.Limbs do
+		local body = if limb.IsArm then chestMove else hipsMove
+		local joint = body * rest(limb.Upper).Position
+		local home = Vector3.new(joint.X, ground, joint.Z)
+			+ right * limb.Side * (if limb.IsArm then Gait.HandSide else Gait.FootSide)
+			+ look * (if limb.IsArm then Gait.HandForward else -Gait.FootBack)
+		local target: Vector3
+		if limb.IsArm and ankles then
+			-- 붙잡은 발목을 쥠
+			target = ankles + right * limb.Side * 0.5
+			limb.Plant = nil
+			limb.Stepping = false
 		else
-			local armPhase = phase + (if index == 1 then 0 else math.pi)
-			local stroke = math.sin(armPhase) -- 1 = 앞으로 쭉 뻗음, -1 = 옆으로 당겨짐
-			local angle = math.rad(45 - stroke * 32)
-			local lift = math.max(0, math.cos(armPhase)) * 0.4 -- 앞으로 내밀 때는 손을 듦
-			to = look * math.cos(angle) + right * sideSign * math.sin(angle) + up * (-0.3 + lift)
+			local plant = limb.Plant
+			if not plant or (plant - home).Magnitude > 14 then
+				plant = home
+				limb.Stepping = false
+			end
+			if limb.Stepping then
+				local t = (now - limb.StepStart) / Gait.StepTime
+				if t >= 1 then
+					limb.Stepping = false
+					plant = home + lead
+					target = plant
+				else
+					-- 손발을 들어 다음 자리로 옮김
+					target = limb.From:Lerp(home + lead, t) + up * math.sin(t * math.pi) * Gait.StepLift
+				end
+			else
+				target = plant
+				-- 대각선 짝(왼손+오른발, 오른손+왼발)끼리 같이 움직임: 다른 짝이 발을 떼고 있으면 기다림
+				local otherPairMoving = false
+				for j, other in r.Limbs do
+					local samePair = (index == j) or (index + j == 5)
+					if other.Stepping and not samePair then
+						otherPairMoving = true
+					end
+				end
+				if (plant - home).Magnitude > Gait.StepDistance and not otherPairMoving then
+					limb.Stepping = true
+					limb.StepStart = now
+					limb.From = plant
+				end
+			end
+			limb.Plant = plant
 		end
-		aimArm(arm, toRest * to, w)
-	end
-
-	-- 다리는 뒤로 끌려오며 좌우로 흔들림
-	for index, leg in r.Legs do
-		local sway = math.sin(phase + index * 2.4) * math.rad(Gait.LegSway) * w
-		leg.Transform = localTurn(leg, bodyRot:Inverse() * CFrame.fromAxisAngle(up, sway) * bodyRot)
+		-- 팔꿈치·무릎은 위·바깥으로 꺾임 (거미처럼)
+		local pole = up + right * limb.Side * (if limb.IsArm then 0.7 else 0.9) + look * (if limb.IsArm then -0.3 else 0.3)
+		reachLimb(limb, rest, body, target, pole, w)
 	end
 end
 
@@ -307,6 +429,14 @@ local function step(dt: number)
 		if moved > 0.03 then
 			lastMoved = now
 		end
+		-- 서버 위치는 띄엄띄엄 오므로 속도는 부드럽게 추정
+		if dt > 0 then
+			local v = Vector3.new(pos.X - lastPos.X, 0, pos.Z - lastPos.Z) / dt
+			velocity = velocity:Lerp(v, math.min(1, dt * 6))
+		end
+		if Gait.Style == "Crawl" then
+			clock += moved / Gait.SlitherLength
+		end
 	end
 	lastPos = pos
 	local moving = now - lastMoved < 0.3
@@ -324,8 +454,6 @@ local function step(dt: number)
 	end
 
 	if crawling then
-		-- 붙잡고 있을 때는 천천히 꿈틀거림
-		clock += dt * Gait.CrawlSpeed * (if moving then 1 else 0.2)
 		crawl(r, weight, now, pivotCf, ankles)
 	else
 		clock += dt * Data.Fps * Gait.RunSpeed
