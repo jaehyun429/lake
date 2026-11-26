@@ -114,7 +114,8 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		grabbed = true
 		HUD.showMash(true)
 		Effects.setWarning(true)
-		Effects.shake(0.6, 6)
+		Effects.jumpscare()
+		Effects.shake(0.9, 5)
 		Effects.flash(0.4, 0.5)
 	elseif kind == "MashProgress" then
 		HUD.setMash(data.Count, data.Required)
@@ -128,6 +129,7 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 		Effects.setWarning(false)
 		Effects.shake(data.Time or 2.5, 10)
 		Effects.flash(0.2, data.Time or 2.5)
+		Effects.dragBlackout(data.Time or 2.5)
 	elseif kind == "Lantern" then
 		playUi(Config.Sounds.Click, 0.5, if data.On then 1.1 else 0.95)
 	elseif kind == "Trapped" then

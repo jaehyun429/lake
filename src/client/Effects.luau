@@ -19,6 +19,10 @@ local redFlash: Frame
 local threat = 0
 local warning = false
 local heartbeat: Sound
+local blackout: Frame
+local blackoutText: TextLabel
+local scareStart = 0 -- 붙잡힘 점프스케어 시작 시각
+local baseFov = 70
 local shakeUntil = 0
 local shakeStrength = 0
 local lanternOn = false
@@ -63,6 +67,26 @@ function Effects.init()
 	redFlash.BorderSizePixel = 0
 	redFlash.Size = UDim2.fromScale(1, 1)
 	redFlash.Parent = gui
+
+	-- 끌려갈 때 암전
+	blackout = Instance.new("Frame")
+	blackout.BackgroundColor3 = Color3.fromRGB(2, 6, 10)
+	blackout.BackgroundTransparency = 1
+	blackout.BorderSizePixel = 0
+	blackout.Size = UDim2.fromScale(1, 1)
+	blackout.ZIndex = 5
+	blackout.Parent = gui
+	blackoutText = Instance.new("TextLabel")
+	blackoutText.BackgroundTransparency = 1
+	blackoutText.Size = UDim2.fromScale(1, 1)
+	blackoutText.Font = Enum.Font.GothamMedium
+	blackoutText.TextSize = 30
+	blackoutText.TextColor3 = Color3.fromRGB(190, 200, 210)
+	blackoutText.TextTransparency = 1
+	blackoutText.Text = ""
+	blackoutText.ZIndex = 6
+	blackoutText.Parent = blackout
+	baseFov = (workspace.CurrentCamera or camera).FieldOfView
 
 	-- 심장박동 루프 (위협이 높을수록 빠르고 큼)
 	heartbeat = Instance.new("Sound")
@@ -120,7 +144,14 @@ function Effects.init()
 		local target = if lanternOn then 1 else 0
 		lanternAlpha += math.clamp(target - lanternAlpha, -dt * 8, dt * 8)
 		beamPart.CFrame = cam.CFrame * CFrame.new(0.35, -0.4, 0.2)
-		beam.Brightness = L.Brightness * lanternAlpha
+		-- 귀신이 가까우면 랜턴이 깜빡임
+		local flickerAmount = math.clamp((threat - Config.Scare.FlickerThreat) / (1 - Config.Scare.FlickerThreat), 0, 1)
+		local flicker = 1
+		if flickerAmount > 0 and not adminBright then
+			local n = math.noise(os.clock() * 9, 3.7) + math.noise(os.clock() * 31, 9.1) * 0.6
+			flicker = 1 - flickerAmount * math.clamp(n * 1.6 + 0.35, 0, 0.92)
+		end
+		beam.Brightness = L.Brightness * lanternAlpha * flicker
 		beam.Enabled = lanternAlpha > 0.01
 
 		local level = math.max(threat, if warning then 1 else 0)
@@ -135,6 +166,26 @@ function Effects.init()
 		end
 		for _, f in vignette do
 			f.BackgroundTransparency = 1 - dark
+		end
+		-- 붙잡힘 점프스케어: 화면이 뒤의 귀신 얼굴 쪽으로 홱 돌아가고 확대됨
+		local scareT = os.clock() - scareStart
+		local scareTime = Config.Scare.GrabLookTime
+		if scareT < scareTime then
+			local map = workspace:FindFirstChild("DeadLake")
+			local ghost = map and map:FindFirstChild("Ghost")
+			local pivot = ghost and ghost:IsA("Model") and ghost.PrimaryPart
+			-- 빠르게 돌아가서 머물다가 끝에서 풀림
+			local a = math.min(1, scareT / 0.12) * math.clamp((scareTime - scareT) / 0.25, 0, 1)
+			if pivot then
+				local face = pivot.Position + Vector3.new(0, Config.Scare.GrabFaceHeight, 0)
+				local pos = cam.CFrame.Position
+				if (face - pos).Magnitude > 0.5 then
+					cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(pos, face), a)
+				end
+			end
+			cam.FieldOfView = baseFov - Config.Scare.GrabZoom * a
+		elseif cam.FieldOfView ~= baseFov and scareT < scareTime + 1 then
+			cam.FieldOfView = baseFov
 		end
 		if os.clock() < shakeUntil then
 			local s = shakeStrength
@@ -269,6 +320,25 @@ function Effects.setWarning(on: boolean)
 		redFlash.BackgroundTransparency = 0.55
 		TweenService:Create(redFlash, TweenInfo.new(0.8), { BackgroundTransparency = 1 }):Play()
 	end
+end
+
+-- 붙잡힌 순간: 귀신 얼굴을 강제로 보게 함
+function Effects.jumpscare()
+	scareStart = os.clock()
+end
+
+-- 호수로 끌려감: fadeIn 초 동안 어두워지고, 글씨가 떴다가 걷힘
+function Effects.dragBlackout(fadeIn: number)
+	blackout.BackgroundTransparency = 1
+	blackoutText.TextTransparency = 1
+	blackoutText.Text = Config.Scare.DeathText
+	TweenService:Create(blackout, TweenInfo.new(fadeIn, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { BackgroundTransparency = 0 }):Play()
+	task.delay(fadeIn, function()
+		TweenService:Create(blackoutText, TweenInfo.new(0.8), { TextTransparency = 0 }):Play()
+		task.wait(Config.Scare.DeathHold)
+		TweenService:Create(blackoutText, TweenInfo.new(0.8), { TextTransparency = 1 }):Play()
+		TweenService:Create(blackout, TweenInfo.new(1.5), { BackgroundTransparency = 1 }):Play()
+	end)
 end
 
 function Effects.shake(seconds: number, strength: number)
