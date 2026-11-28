@@ -93,6 +93,11 @@ player:GetAttributeChangedSignal("LanternOn"):Connect(function()
 	HUD.setLantern(on)
 	Effects.setLantern(on)
 end)
+local function refreshLives()
+	HUD.setLives((player:GetAttribute("Lives") :: number?) or Config.Ghost.Lives, Config.Ghost.Lives)
+end
+player:GetAttributeChangedSignal("Lives"):Connect(refreshLives)
+refreshLives()
 player:GetAttributeChangedSignal("Carrying"):Connect(function()
 	HUD.setCarrying(player:GetAttribute("Carrying") == true)
 end)
@@ -113,8 +118,8 @@ toClient.OnClientEvent:Connect(function(kind: string, data: any)
 	elseif kind == "Danger" then
 		Effects.setWarning(data.Level == 1)
 	elseif kind == "Grabbed" then
-		grabbed = true
-		HUD.showMash(true)
+		grabbed = data.CanMash ~= false
+		HUD.showMash(true, data.CanMash ~= false)
 		Effects.setWarning(true)
 		Effects.setGrabShot(true)
 		Effects.shake(0.9, 5)

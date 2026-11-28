@@ -44,6 +44,9 @@ local gaugeFill: Frame
 local gaugeText: TextLabel
 local mashFrame: Frame
 local mashFill: Frame
+local mashBg: Frame
+local mashLabel: TextLabel
+local livesLabel: TextLabel
 
 local resultFrame: Frame
 local resultTitle: TextLabel
@@ -174,7 +177,7 @@ function HUD.init()
 		Visible = false,
 	})
 	Instance.new("UICorner", mashFrame).CornerRadius = UDim.new(0, 12)
-	label(mashFrame, {
+	mashLabel = label(mashFrame, {
 		Size = UDim2.new(1, 0, 0, 60),
 		Position = UDim2.fromOffset(0, 8),
 		Text = "발목을 잡혔다!\n[E] 를 연타해서 뿌리치세요!",
@@ -182,13 +185,21 @@ function HUD.init()
 		Font = FONT_BOLD,
 		TextColor3 = Color3.fromRGB(255, 120, 110),
 	})
-	local mashBg = frame(
+	mashBg = frame(
 		mashFrame,
 		{ Size = UDim2.new(1, -40, 0, 16), Position = UDim2.fromOffset(20, 78), BackgroundColor3 = Color3.fromRGB(20, 20, 20), BackgroundTransparency = 0 }
 	)
 	Instance.new("UICorner", mashBg).CornerRadius = UDim.new(0, 6)
 	mashFill = frame(mashBg, { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(230, 90, 80), BackgroundTransparency = 0 })
 	Instance.new("UICorner", mashFill).CornerRadius = UDim.new(0, 6)
+
+	livesLabel = label(gui, {
+		Size = UDim2.fromOffset(260, 24),
+		Position = UDim2.new(0, 18, 1, -44),
+		Text = "",
+		TextSize = 18,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
 
 	-- 결과 화면
 	resultFrame = frame(gui, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(0, 0, 0), BackgroundTransparency = 0.45, Visible = false })
@@ -291,11 +302,22 @@ function HUD.setGauge(visible: boolean, progress: number, paused: boolean)
 	end
 end
 
-function HUD.showMash(visible: boolean)
+-- canMash 가 false 면 뿌리칠 힘이 없어 팀원 구조만 기다림
+function HUD.showMash(visible: boolean, canMash: boolean?)
 	mashFrame.Visible = visible
 	if visible then
 		mashFill.Size = UDim2.fromScale(0, 1)
+		mashBg.Visible = canMash ~= false
+		mashLabel.Text = if canMash ~= false
+			then "발목을 잡혔다!\n[E] 를 연타해서 뿌리치세요!"
+			else "발목을 잡혔다!\n뿌리칠 힘이 없다... 팀원의 구조를 기다리세요"
 	end
+end
+
+-- 남은 뿌리칠 힘 (왼쪽 아래)
+function HUD.setLives(lives: number, max: number)
+	livesLabel.Text = "뿌리칠 힘  " .. string.rep("●", math.max(0, lives)) .. string.rep("○", math.max(0, max - lives))
+	livesLabel.TextColor3 = if lives > 0 then Color3.fromRGB(220, 220, 220) else Color3.fromRGB(255, 110, 100)
 end
 
 function HUD.setMash(count: number, required: number)

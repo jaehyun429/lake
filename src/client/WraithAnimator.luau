@@ -49,6 +49,8 @@ local nextTwitch = 0
 local twitchUntil = 0
 local twitchAngle = -1
 local velocity = Vector3.zero -- 귀신의 수평 이동 속도 (부드럽게 추정)
+local lastState = ""
+local stunStart = 0 -- 쓰러진 시각
 local clock = 0
 local nextSearch = 0
 
@@ -271,7 +273,8 @@ end
 
 -- 네 발로 기는 자세: 손과 발을 땅의 한 지점에 짚어 두고, 몸이 지나가면 다음 지점으로 옮겨 짚음.
 -- w = 0(서 있음) ~ 1(완전히 엎드림)
-local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Vector3?)
+-- stun = 뿌리쳐져 쓰러진 뒤 지난 시간(초). 쓰러져 있지 않으면 nil
+local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Vector3?, stun: number?)
 	local right, look, up = pivotCf.RightVector, pivotCf.LookVector, Vector3.yAxis
 	local function rest(bone: Bone): CFrame
 		return pivotCf * r.RestLocal[bone]
@@ -282,10 +285,31 @@ local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Ve
 	local p = hipsRest.Position
 	local ground = p.Y - r.HipRestHeight
 	local phase = clock * math.pi * 2
-	local bodyRot = CFrame.fromAxisAngle(look, math.sin(phase) * math.rad(Gait.Slither) * w)
+	-- 쓰러짐: collapse 0(기는 자세) ~ 1(옆으로 쓰러져 늘어짐), twist = 다시 일어나기 직전의 뒤틀림
+	local collapse, twistRoll, twistSpine, twistHead = 0, 0, 0, 0
+	if stun then
+		local twistStart = Config.Ghost.StunTime - Gait.TwistTime
+		if stun < twistStart then
+			collapse = math.min(1, stun / 0.25)
+		else
+			-- 뚝뚝 끊기는 경련과 함께 몸을 뒤틀며 일어남
+			local q = math.floor(stun * Gait.TwistFps) / Gait.TwistFps
+			local u = math.clamp((q - twistStart) / Gait.TwistTime, 0, 1)
+			collapse = 1 - u
+			local jerk = math.noise(q * 7.3, 1.7) * 2
+			local jerk2 = math.noise(q * 5.1, 8.2) * 2
+			local amount = math.sin(u * math.pi) -- 중간에 가장 심하게
+			twistRoll = jerk * math.rad(Gait.TwistAngle) * amount
+			twistSpine = -(jerk + jerk2 * 0.5) * math.rad(Gait.TwistAngle) * 1.3 * amount
+			twistHead = (if jerk2 > 0 then 1 else -1) * math.rad(80) * amount
+		end
+	end
+	local hipHeight = Gait.HipHeight + (Gait.CollapseHeight - Gait.HipHeight) * collapse
+	local pitch = Gait.Pitch + (90 - Gait.Pitch) * collapse
+	local bodyRot = CFrame.fromAxisAngle(look, (math.sin(phase) * math.rad(Gait.Slither) + math.rad(Gait.CollapseRoll) * collapse + twistRoll) * w)
 		* CFrame.fromAxisAngle(up, math.cos(phase) * math.rad(Gait.Slither) * 0.6 * w)
-		* CFrame.fromAxisAngle(right, -math.rad(Gait.Pitch) * w)
-	local offset = (-up * (r.HipRestHeight - Gait.HipHeight) - look * Gait.BodyBack) * w
+		* CFrame.fromAxisAngle(right, -math.rad(pitch) * w)
+	local offset = (-up * (r.HipRestHeight - hipHeight) - look * Gait.BodyBack) * w
 	local hipsMove = CFrame.new(p + offset) * bodyRot * CFrame.new(-p)
 	r.Hips.Transform = hipsRest:Inverse() * hipsMove * hipsRest
 
@@ -293,7 +317,11 @@ local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Ve
 	local chestMove = hipsMove
 	if r.Spine then
 		local spineRest = rest(r.Spine)
-		local arch = bodyRot:Inverse() * CFrame.fromAxisAngle(right, math.rad(Gait.Arch) * w) * bodyRot
+		-- 평소엔 가슴을 살짝 들고, 뒤틀 때는 몸통 축으로 엉덩이와 반대로 꼬임
+		local arch = bodyRot:Inverse()
+			* CFrame.fromAxisAngle(look, twistSpine * w)
+			* CFrame.fromAxisAngle(right, math.rad(Gait.Arch) * (1 - collapse) * w)
+			* bodyRot
 		r.Spine.Transform = spineRest.Rotation:Inverse() * arch * spineRest.Rotation
 		chestMove = hipsMove * CFrame.new(spineRest.Position) * arch * CFrame.new(-spineRest.Position)
 	end
@@ -302,7 +330,9 @@ local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Ve
 	-- 고개를 들어 앞을 보고, 목은 옆으로 꺾임
 	if r.Head then
 		local headRest = rest(r.Head).Rotation
-		local turn = CFrame.fromAxisAngle(look, headTilt(now) * w) * CFrame.fromAxisAngle(right, math.rad(Gait.HeadUp) * w)
+		-- 쓰러져 있을 때는 고개를 떨구고, 뒤틀 때는 목이 홱 돌아감
+		local tilt = if stun then twistHead else headTilt(now)
+		local turn = CFrame.fromAxisAngle(look, tilt * w) * CFrame.fromAxisAngle(right, math.rad(Gait.HeadUp) * (1 - collapse) * w)
 		r.Head.Transform = headRest:Inverse() * chestRot:Inverse() * turn * chestRot * headRest
 	end
 
@@ -347,7 +377,8 @@ local function crawl(r: Rig, w: number, now: number, pivotCf: CFrame, ankles: Ve
 						otherPairMoving = true
 					end
 				end
-				if (plant - home).Magnitude > Gait.StepDistance and not otherPairMoving then
+				-- 쓰러져 있는 동안은 손발을 옮기지 않고 늘어뜨림
+				if (plant - home).Magnitude > Gait.StepDistance and not otherPairMoving and not stun then
 					limb.Stepping = true
 					limb.StepStart = now
 					limb.From = plant
@@ -445,8 +476,22 @@ local function step(dt: number)
 
 	local holdBefore = holdWeight
 	holdWeight += math.clamp((if ankles then 1 else 0) - holdWeight, -dt * 5, dt * 5)
-	-- 기는 자세는 발목을 잡고 있는 동안에도 유지
-	local goal = if moving or (crawling and ankles ~= nil) then 1 else 0
+	-- 서버가 알려준 귀신 상태. 뿌리쳐지면(Stunned) 쓰러짐
+	local state = (r.Ghost:GetAttribute("State") :: string?) or ""
+	if state ~= lastState then
+		lastState = state
+		if state == "Stunned" then
+			stunStart = now
+		end
+	end
+	local stun = if crawling and state == "Stunned" then now - stunStart else nil
+	-- 기는 자세: 호수에 잠겨 있을 때(Lurking)와 봉인될 때만 서 있고, 물 밖에서는 멈춰 있어도 엎드려 있음
+	local goal: number
+	if crawling and state ~= "" then
+		goal = if state == "Lurking" or state == "Sealed" then 0 else 1
+	else
+		goal = if moving or (crawling and ankles ~= nil) then 1 else 0
+	end
 	local before = weight
 	weight += math.clamp(goal - weight, -dt * 3, dt * 3)
 	if weight <= 0 and before <= 0 and holdWeight <= 0 and holdBefore <= 0 then
@@ -454,7 +499,7 @@ local function step(dt: number)
 	end
 
 	if crawling then
-		crawl(r, weight, now, pivotCf, ankles)
+		crawl(r, weight, now, pivotCf, ankles, stun)
 	else
 		clock += dt * Data.Fps * Gait.RunSpeed
 		run(r, weight, now, pivotCf, ankles, holdWeight)

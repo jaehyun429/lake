@@ -67,9 +67,12 @@ Config.Ghost = {
 	CatchRange = 4.5,
 	HearRange = 12, -- 랜턴 꺼도 이 거리 안이면 들킴
 	SeeRange = 120, -- 사냥 중 랜턴 켠 플레이어를 보는 거리
-	StunTime = 4, -- 뿌리쳤을 때 귀신 경직
+	StunTime = 4, -- 뿌리쳤을 때 귀신이 쓰러져 있는 시간
+	KnockbackSpeed = 22, -- 뿌리쳐진 순간 뒤로 튕겨나가는 속도 (스터드/초, 점점 줄어듦)
+	KnockbackTime = 0.45, -- 튕겨나가는 시간. 거리 ≈ 속도 × 시간 ÷ 2
 	GrabEscapeTime = 4,
 	MashRequired = 10,
+	Lives = 2, -- 한 판에 스스로 뿌리칠 수 있는 횟수. 다 쓰면 붙잡혔을 때 팀원 구조만 가능 (팀원 구조는 횟수를 안 씀)
 	RescueHoldTime = 1.5,
 	ImmunityAfterEscape = 6,
 	DragTime = 3,
@@ -189,6 +192,12 @@ Config.Gait = {
 	StepDistance = 2.2, -- 짚은 자리에서 이만큼 멀어지면 손발을 옮겨 짚음
 	StepTime = 0.13, -- 한 번 옮겨 짚는 데 걸리는 시간 (초)
 	StepLift = 0.9, -- 옮길 때 손발을 드는 높이
+	-- 뿌리쳐졌을 때: 튕겨나가 옆으로 쓰러져 가만히 있다가, 몸을 기괴하게 뒤틀며 다시 일어나 기어 옴
+	CollapseHeight = 0.9, -- 쓰러졌을 때 엉덩이 높이
+	CollapseRoll = 55, -- 옆으로 쓰러지는 각도
+	TwistTime = 1.4, -- 쓰러져 있는 시간 중 마지막 몇 초 동안 몸을 뒤트는지
+	TwistAngle = 45, -- 뒤틀 때 몸통이 꺾이는 각도
+	TwistFps = 9, -- 뒤트는 동작을 초당 몇 장으로 끊을지 (뚝뚝 끊겨야 기괴함)
 	-- Run
 	RunSpeed = 0.8, -- 다리 움직임 속도 배율
 	StepFps = 12, -- 초당 몇 장으로 끊어 보일지 (스톱모션처럼 뚝뚝 끊김. 0 이면 부드럽게)

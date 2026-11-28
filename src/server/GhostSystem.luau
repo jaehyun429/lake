@@ -49,6 +49,7 @@ local gLastKnown: Vector3? = nil
 local gTimer = 0
 local gWander = 0
 local gGiveUp = 0
+local gKnock = 0 -- 뿌리쳐졌을 때 뒤로 튕겨나가는 속도
 local sinkAmount = 0 -- 0 수면, 1 완전 잠수
 local bodyTime = 0
 local nextSubmerge = 0
@@ -67,6 +68,9 @@ local function getState(player: Player): PState
 	if not s then
 		s = { Awareness = 0, Immune = 0, Phase = "Idle", Timer = 0, Mash = 0, LastMash = 0 }
 		states[player] = s
+		if player:GetAttribute("Lives") == nil then
+			player:SetAttribute("Lives", G.Lives)
+		end
 	end
 	return s
 end
@@ -242,11 +246,19 @@ local function release(player: Player, s: PState, reason: string, rescuer: Playe
 	if reason == "Rescued" and rescuer then
 		Net.notifyAll(string.format("%s님이 %s님을 구조했습니다!", rescuer.DisplayName, player.DisplayName), 3)
 	elseif reason == "Escaped" then
-		Net.notify(player, "뿌리쳤다! 랜턴을 끄고 도망치세요.", 3)
+		-- 스스로 뿌리치면 힘을 하나 씀
+		local lives = math.max(0, ((player:GetAttribute("Lives") :: number?) or G.Lives) - 1)
+		player:SetAttribute("Lives", lives)
+		if lives > 0 then
+			Net.notify(player, string.format("뿌리쳤다! 랜턴을 끄고 도망치세요. (뿌리칠 힘 %d번 남음)", lives), 4)
+		else
+			Net.notify(player, "뿌리쳤다! 하지만 이제 힘이 없다... 다음에 잡히면 팀원만 구해줄 수 있다.", 5)
+		end
 	end
 	if reason ~= "Reset" and not sealed then
 		gState = "Stunned"
 		gTimer = G.StunTime
+		gKnock = G.KnockbackSpeed
 		gTarget = nil
 		local root = PlayerState.getRoot(player)
 		gLastKnown = if root then root.Position else gPos
@@ -341,7 +353,8 @@ local function grab(player: Player, s: PState, root: BasePart, hum: Humanoid)
 		end
 	end)
 	s.RescuePrompt = prompt
-	Net.send(player, "Grabbed", { Time = G.GrabEscapeTime, Mash = G.MashRequired })
+	local canMash = ((player:GetAttribute("Lives") :: number?) or G.Lives) > 0
+	Net.send(player, "Grabbed", { Time = G.GrabEscapeTime, Mash = G.MashRequired, CanMash = canMash })
 	for _, other in Players:GetPlayers() do
 		if other ~= player then
 			Net.notify(other, string.format("%s님이 붙잡혔습니다! 가까이 가서 구조하세요.", player.DisplayName), 4)
@@ -373,6 +386,9 @@ function GhostSystem.resetAll()
 		s.Phase = "Idle"
 		player:SetAttribute("Awareness", 0)
 		player:SetAttribute("Threat", 0)
+	end
+	for _, player in Players:GetPlayers() do
+		player:SetAttribute("Lives", G.Lives)
 	end
 	sealed = false
 	gState = "Lurking"
@@ -503,6 +519,12 @@ function GhostSystem.update(dt: number)
 			updateLurking(dt)
 		end
 	elseif gState == "Stunned" then
+		-- 뿌리쳐진 직후 뒤로 튕겨나갔다가 멈춤
+		if gKnock > 0 then
+			local back = gPos - gLook * gKnock * dt
+			gPos = Vector3.new(back.X, groundY(back.X, back.Z), back.Z)
+			gKnock = math.max(0, gKnock - G.KnockbackSpeed / G.KnockbackTime * dt)
+		end
 		gTimer -= dt
 		if gTimer <= 0 then
 			startSearch(gLastKnown or gPos)
@@ -599,6 +621,10 @@ function GhostSystem.update(dt: number)
 	end
 
 	GhostBuilder.setMoving(body, gState == "Hunting" or gState == "Returning" or gState == "Searching")
+	-- 클라이언트가 자세(서 있음/기어감/쓰러짐)를 고를 수 있게 상태를 알려줌
+	if body:GetAttribute("State") ~= gState then
+		body:SetAttribute("State", gState)
+	end
 	placeBody()
 end
 
@@ -628,7 +654,7 @@ function GhostSystem.init(mapInfo: any, context: typeof(ctx))
 
 	Net.on("Mash", function(player)
 		local s = states[player]
-		if not s or s.Phase ~= "Grabbed" then
+		if not s or s.Phase ~= "Grabbed" or ((player:GetAttribute("Lives") :: number?) or G.Lives) <= 0 then
 			return
 		end
 		local now = os.clock()
